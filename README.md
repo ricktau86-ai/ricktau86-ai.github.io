@@ -1,1 +1,0 @@
-# ricktau86-ai.github.io
