@@ -1,0 +1,44 @@
+{
+  "name": "App Nonô",
+  "short_name": "Nonô",
+  "description": "App de gestão de diabetes da Leonor — Família Machado",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#FFF5F8",
+  "theme_color": "#FF6B9D",
+  "lang": "pt",
+  "categories": ["health", "medical"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Regra de 3",
+      "short_name": "HC",
+      "description": "Calcular hidratos de carbono",
+      "url": "/?screen=alimentacaoScreen",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Modo Offline",
+      "short_name": "Offline",
+      "description": "Acesso sem internet",
+      "url": "/?screen=offlineScreen",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
