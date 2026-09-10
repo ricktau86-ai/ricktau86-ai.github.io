@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">App Nonô</string>
+    <string name="title_activity_main">App Nonô</string>
+    <string name="package_name">pt.machado.appnono</string>
+    <string name="custom_url_scheme">pt.machado.appnono</string>
+</resources>

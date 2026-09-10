@@ -1,0 +1,28 @@
+{
+  "name": "ricktau86-ai.github.io",
+  "version": "1.0.0",
+  "description": "App familiar para gestão de diabetes Tipo 1 (Tandem t:slim X2 + Dexcom G6).",
+  "main": "sw.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ricktau86-ai/ricktau86-ai.github.io.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ricktau86-ai/ricktau86-ai.github.io/issues"
+  },
+  "homepage": "https://github.com/ricktau86-ai/ricktau86-ai.github.io#readme",
+  "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.1"
+  }
+}

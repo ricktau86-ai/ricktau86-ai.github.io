@@ -1,0 +1,18 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Android / Gradle build output (regenerado automaticamente)
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/.cxx/
+android/*.iml
+android/app/*.iml
+android/.idea/
+
+# Ficheiros gerados (APK/AAB) — não versionar binários compilados
+*.apk
+*.aab
