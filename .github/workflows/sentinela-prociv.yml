@@ -7,6 +7,9 @@ on:
       debug:
         description: "Mostrar detalhes"
         default: "0"
+      explorar:
+        description: "Explorar o portal (só diagnóstico)"
+        default: "0"
 permissions:
   contents: write
 concurrency:
@@ -19,6 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { sparse-checkout: sentinela/tools }
+      - name: Explorar portal
+        if: ${{ github.event.inputs.explorar == '1' }}
+        run: python3 sentinela/tools/explorar.py; exit 1
       - name: Recolher ocorrências
         env: { DEBUG: "${{ github.event.inputs.debug || '0' }}" }
         run: python3 sentinela/tools/prociv.py /tmp/ocorrencias.json
