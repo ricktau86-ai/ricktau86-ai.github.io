@@ -283,7 +283,7 @@ const WIDGETS = [
 const DEF = {
   me:{ lat:39.7436, lon:-8.8071, name:"Leiria" }, gps:false, cities:[], sel:"me",
   layout: WIDGETS.map(w=>({ id:w[0], on:true })),
-  nAlerts:true, nMinLvl:"yellow", nTypes:{ meteo:true, incendio:true, sismo:true, ar:false, luz:false }, nDist:50,
+  nAlerts:true, nMinLvl:"yellow", nTypes:{ meteo:true, incendio:true, sismo:true, ar:false, luz:false, dd:true }, nDist:50,
   quiet:false, qFrom:"23:00", qTo:"07:00", nAct:false, nActR:10, breakingDash:true,
   radius:50, temp:"C", proxy:"", onboarded:false, nbDismissed:false
 };
@@ -367,6 +367,33 @@ const areaName=a=>AREAS[a]?AREAS[a][0]:a;
 
 const S={ warnings:[], act:[], actSrc:"", quakes:[], rcm:{}, wx:null, aq:null, outages:null, shelters:[], meta:{}, fails:[] };
 const IPMA="https://api.ipma.pt/open-data";
+/* Na app Android (Capacitor) os pedidos são nativos: não há bloqueios de CORS do browser */
+const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+const LN=()=>NATIVE&&window.Capacitor.Plugins&&window.Capacitor.Plugins.LocalNotifications;
+/* Downdetector — consulta a página pública de cada serviço, só quando a app atualiza (sem API gratuita) */
+async function ddCheck(slug){
+  const ctrl=new AbortController(); const tm=setTimeout(()=>ctrl.abort(),15000);
+  try{
+    const r=await fetch(`https://downdetector.pt/problemas/${slug}/`,{signal:ctrl.signal,headers:{"Accept":"text/html","Accept-Language":"pt-PT,pt;q=0.9"}});
+    const html=await r.text();
+    if(/just a moment|cf-chl|challenge-platform|attention required/i.test(html)) return {st:"blk"};
+    const txt=html.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<[^>]+>/g," ").replace(/\s+/g," ");
+    const m=txt.match(/(relat[oó]rios[^.]{0,40}indicam[^.]{0,160})/i)||txt.match(/(user reports indicate[^.]{0,160})/i);
+    const sent=m?m[1].trim():"";
+    let st="unk";
+    if(/n[aã]o h[aá] problemas|sem problemas|no current problems/i.test(sent)) st="ok";
+    else if(/poss[ií]ve(l|is) problemas|possible problems/i.test(sent)) st="warn";
+    else if(/problemas|problems|falha|outage/i.test(sent)) st="bad";
+    else if(/alert-danger/.test(html)) st="bad"; else if(/alert-warning/.test(html)) st="warn"; else if(/alert-success/.test(html)) st="ok";
+    return {st, txt:sent};
+  }catch(e){ return {st:"err"}; } finally{ clearTimeout(tm); }
+}
+async function loadDD(){
+  if(!NATIVE) return; const prev=LS.get("dd",{}); const res={};
+  await Promise.all(DD.map(async([n,slug])=>{ res[slug]=await ddCheck(slug); }));
+  if(Object.values(res).every(x=>x.st==="err"||x.st==="blk")){ S.dd={res,t:Date.now(),fail:true}; throw new Error("Downdetector inacessível"); }
+  S.dd={res,t:Date.now(),prev}; LS.set("dd",Object.fromEntries(Object.entries(res).map(([k,v])=>[k,v.st])));
+}
 
 /* ======================================================================
    FONTES
@@ -516,8 +543,9 @@ const WR={
         :`<div class="clear"><div class="ok">${ic(P.check)}</div><div><b>Sem falhas de energia registadas</b></div></div>`; }
     b+=`<a class="small" href="https://www.e-redes.pt/pt-pt/avarias-e-emergencias" target="_blank" rel="noopener">Comunicar avaria ou consultar a sua morada na E-REDES</a>`;
     b+=`<div class="small" style="font-weight:600;margin-top:4px">Outros serviços — Downdetector</div><div class="svc">`+
-      DD.map(([n,s,c,l])=>`<a href="https://downdetector.pt/problemas/${s}/" target="_blank" rel="noopener"><i style="--sc:${c}">${l}</i>${n}</a>`).join("")+`</div>
-      <div class="small muted">Abre o Downdetector com as queixas dos utilizadores em tempo real. O Downdetector não tem uma API gratuita, por isso estes dados não aparecem dentro da app. <a href="https://downdetector.pt/" target="_blank" rel="noopener">Ver todos</a></div>`;
+      DD.map(([n,s,c,l])=>{ const r=S.dd&&S.dd.res[s]; const st=r?r.st:null; const lab={ok:["Sem problemas","#81c784"],warn:["Possíveis problemas","#ffd54f"],bad:["Problemas","#ff5449"],unk:["Ver","#938f99"],blk:["Ver","#938f99"],err:["Ver","#938f99"]}[st]||null;
+        return `<a href="https://downdetector.pt/problemas/${s}/" target="_blank" rel="noopener" ${st==="bad"?'style="outline:2px solid #ff5449"':st==="warn"?'style="outline:2px solid #ffd54f"':""}><i style="--sc:${c}">${l}</i>${n}${lab?`<span style="font-size:11px;color:${lab[1]}">${lab[0]}</span>`:""}</a>`; }).join("")+`</div>
+      <div class="small muted">${NATIVE?(S.dd?(S.dd.fail?"O Downdetector não respondeu agora; toque num serviço para abrir a página.":`Relatos de utilizadores no Downdetector, verificado ${ago(S.dd.t)}. Toque para ver o gráfico.`):"A verificar o Downdetector…"):"Na app Android, o estado de cada serviço aparece aqui. No browser, toque para abrir o Downdetector."} <a href="https://downdetector.pt/" target="_blank" rel="noopener">Ver todos</a></div>`;
     return b; },
   sismos(){ const h=here(); const R=Math.max(cfg.radius,100); const wk=Date.now()-7*864e5; const l=S.quakes.map(q=>({...q,d:km(h.lat,h.lon,q.lat,q.lon)}));
     const near=l.filter(q=>q.d<=R&&q.time>=wk), felt=l.filter(q=>q.felt&&q.time>=wk); const show=(near.length?near:felt).slice(0,4);
@@ -558,7 +586,7 @@ function renderWidgets(){
   box.querySelectorAll("[data-allst]").forEach(e=>e.onclick=()=>sheetStories());
   box.querySelectorAll("[data-hist]").forEach(e=>e.onclick=()=>sheetHistory());
   if($("#mini")) drawMini();
-  const n=!("Notification" in window)||Notification.permission!=="default"||cfg.nbDismissed; $("#notifBanner").hidden=n;
+  const n=NATIVE?(cfg.nGranted||cfg.nbDismissed):(!("Notification" in window)||Notification.permission!=="default"||cfg.nbDismissed); $("#notifBanner").hidden=n;
 }
 function drawMini(){
   if(miniMap){ miniMap.remove(); miniMap=null; }
@@ -791,7 +819,7 @@ function renderProfile(){
     v.innerHTML=hdr("Alertas de emergência")+`<div class="group">${sw("nAlerts","Ativar notificações de alertas")}</div><div class="ffoot">Seja avisado de perigos perto de si. Com a app fechada, o Android pode atrasar ou suspender os avisos (limitação das apps web).</div>
       <div class="group"><div class="item" style="cursor:default"><span class="it"><b>Avisar num raio de</b></span><select class="sel" id="nDist">${[10,25,50,100,200].map(x=>`<option value="${x}" ${cfg.nDist==x?"selected":""}>${x} km</option>`).join("")}</select></div>
       <div class="item" style="cursor:default"><span class="it"><b>Gravidade mínima</b></span><select class="sel" id="nMinLvl"><option value="yellow">Moderado e acima (amarelo)</option><option value="orange">Grave e acima (laranja)</option><option value="red">Só extremo (vermelho)</option></select></div></div>
-      <div class="gtitle">Tipos de perigo</div><div class="group">${sw("t_meteo","Tempo severo",t.meteo)}${sw("t_incendio","Incêndios",t.incendio)}${sw("t_sismo","Sismos (M3+)",t.sismo)}${sw("t_ar","Qualidade do ar",t.ar)}${sw("t_luz","Falhas de energia",t.luz)}</div>
+      <div class="gtitle">Tipos de perigo</div><div class="group">${sw("t_meteo","Tempo severo",t.meteo)}${sw("t_incendio","Incêndios",t.incendio)}${sw("t_sismo","Sismos (M3+)",t.sismo)}${NATIVE?sw("t_dd","Falhas de serviços (Downdetector)",t.dd):""}${sw("t_ar","Qualidade do ar",t.ar)}${sw("t_luz","Falhas de energia",t.luz)}</div>
       <div class="gtitle">Horas de silêncio</div><div class="group">${sw("quiet","Ativar horas de silêncio")}
         <div class="item" style="cursor:default"><span class="it"><b>Das</b></span><input class="sel" type="time" id="qFrom" value="${cfg.qFrom}"></div>
         <div class="item" style="cursor:default"><span class="it"><b>Às</b></span><input class="sel" type="time" id="qTo" value="${cfg.qTo}"></div></div>
@@ -886,10 +914,16 @@ function useGPS(after){
 /* ======================================================================
    NOTIFICAÇÕES
    ====================================================================== */
-async function askNotif(){ if(!("Notification" in window)){ toast("Este browser não suporta notificações."); return false; } if(Notification.permission==="granted") return true;
+async function askNotif(){
+  if(LN()){ try{ let p=await LN().checkPermissions(); if(p.display!=="granted") p=await LN().requestPermissions(); cfg.nGranted=p.display==="granted"; save(); renderWidgets(); if(!cfg.nGranted) toast("Notificações desligadas nas definições do telemóvel."); return cfg.nGranted; }catch(e){ return false; } }
+  if(!("Notification" in window)){ toast("Este browser não suporta notificações."); return false; } if(Notification.permission==="granted") return true;
   if(Notification.permission==="denied"){ toast("As notificações estão bloqueadas nas definições do telemóvel."); return false; } const p=await Notification.requestPermission(); renderWidgets(); return p==="granted"; }
 function inQuiet(){ if(!cfg.quiet) return false; const n=new Date(), m=n.getHours()*60+n.getMinutes(); const [a,b]=[cfg.qFrom,cfg.qTo].map(s=>{ const[h,mm]=s.split(":").map(Number); return h*60+mm; }); return a<b?(m>=a&&m<b):(m>=a||m<b); }
-async function notify(title,body,tag,critical){ if(!("Notification" in window)||Notification.permission!=="granted") return; if(!critical&&inQuiet()) return;
+let nId=Math.floor(Date.now()/1000)%100000;
+async function notify(title,body,tag,critical){
+  if(!critical&&inQuiet()) return;
+  if(LN()){ try{ await LN().schedule({notifications:[{id:++nId,title,body,smallIcon:"ic_stat_sentinela",iconColor:"#FFEB3B"}]}); }catch(e){} return; }
+  if(!("Notification" in window)||Notification.permission!=="granted") return;
   try{ const reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration(); if(reg) reg.showNotification(title,{body,tag,icon:"icons/icon-192.png",badge:"icons/icon-192.png"}); else new Notification(title,{body,tag}); }catch(e){} }
 function checkNotify(){
   const seen=new Set(LS.get("seen",[])), first=!LS.get("seenInit",false), add=[];
@@ -899,6 +933,7 @@ function checkNotify(){
       S.warnings.filter(w=>areas.has(w.area)&&LVL[w.lvl]>=LVL[cfg.nMinLvl]).forEach(w=>{ const k="w|"+w.id; if(!seen.has(k)){ add.push(k); if(!first) notify(`Aviso ${LVN[w.lvl].toLowerCase()}: ${w.type}`,`${areaName(w.area)} · ${fDT(w.start)} → ${fDT(w.end)}`,k,LVL[w.lvl]>=2); } }); }
     if(cfg.nTypes.incendio) S.act.filter(a=>a.kind==="fire").forEach(a=>{ const d=Math.min(...places.map(p=>km(p.lat,p.lon,a.lat,a.lon))); const k="f|"+a.id; if(d<=cfg.nDist&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} a ${fKm(d)}`,`${a.loc} · ${a.status}`,k,d<5); } });
     if(cfg.nTypes.sismo) S.quakes.forEach(q=>{ const d=Math.min(...places.map(p=>km(p.lat,p.lon,q.lat,q.lon))); const k="q|"+q.id; if(q.mag>=3&&d<=Math.max(cfg.nDist,100)&&Date.now()-q.time<864e5&&!seen.has(k)){ add.push(k); if(!first) notify(`Sismo M${num(q.mag,1)} a ${fKm(d)}`,`${q.region}, ${fDT(q.time)}`,k,q.mag>=4.5); } });
+    if(cfg.nTypes.dd&&S.dd&&!S.dd.fail){ const prev=S.dd.prev||{}; DD.forEach(([n,slug])=>{ const st=S.dd.res[slug]&&S.dd.res[slug].st; if((st==="bad"||st==="warn")&&prev[slug]!==st&&prev[slug]!=="bad"){ const k="dd|"+slug+"|"+st+"|"+new Date().toDateString(); if(!seen.has(k)){ add.push(k); if(!first) notify(`${n}: ${st==="bad"?"problemas":"possíveis problemas"}`,"Relatos de utilizadores no Downdetector",k,false); } } }); }
     if(cfg.nTypes.ar&&S.aq&&S.aq.current&&S.aq.current.european_aqi>60){ const k="ar|"+new Date().toDateString(); if(!seen.has(k)){ add.push(k); if(!first) notify("Qualidade do ar fraca",`Índice ${S.aq.current.european_aqi} em ${here().name}`,k,false); } }
   }
   if(cfg.nAct) S.act.forEach(a=>{ const d=km(cfg.me.lat,cfg.me.lon,a.lat,a.lon); const k="a|"+a.id; if(d<=cfg.nActR&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} perto de si (${fKm(d)})`,`${a.loc} · ${a.man} operacionais`,k,false); } });
@@ -948,7 +983,7 @@ async function refresh(){
   if(busy) return; busy=true; $("#refreshBtn").classList.add("spin"); S.fails=[];
   $("#offlineBanner").hidden=navigator.onLine!==false;
   renderWidgets();
-  const jobs=[["alertas",loadWarnings],["ocorrências",loadActivity],["sismos",loadQuakes],["risco de incêndio",loadRcm],["tempo",loadWx],["qualidade do ar",loadAq],["energia",loadOutages]];
+  const jobs=[["alertas",loadWarnings],["ocorrências",loadActivity],["sismos",loadQuakes],["risco de incêndio",loadRcm],["tempo",loadWx],["qualidade do ar",loadAq],["energia",loadOutages]]; if(NATIVE) jobs.push(["downdetector",loadDD]);
   await Promise.all(jobs.map(async([n,f])=>{ try{ await f(); }catch(e){ console.warn(n,e); S.fails.push(n); } renderWidgets(); drawMap(); }));
   S.lastAct=S.act.reduce((m,a)=>a.time&&a.time>m?a.time:m,null);
   const off=LS.get("offSh"); if(off&&!S.shelters.length) S.shelters=off.items.slice();
@@ -978,7 +1013,7 @@ if(!cfg.onboarded) onboarding(0);
 refresh();
 setInterval(()=>refresh(),5*60*1000);
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&Date.now()-(refresh.l||0)>3*60e3){ refresh.l=Date.now(); refresh(); } });
-if("serviceWorker" in navigator&&location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+if(!NATIVE&&"serviceWorker" in navigator&&location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>
 </html>

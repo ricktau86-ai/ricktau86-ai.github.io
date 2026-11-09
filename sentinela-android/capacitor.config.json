@@ -1,0 +1,11 @@
+{
+  "appId": "pt.sentinela.alertas",
+  "appName": "Sentinela",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "backgroundColor": "#121212" },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true },
+    "LocalNotifications": { "smallIcon": "ic_stat_sentinela", "iconColor": "#FFEB3B" }
+  }
+}
