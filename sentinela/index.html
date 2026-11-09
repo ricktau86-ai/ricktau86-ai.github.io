@@ -4,334 +4,294 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Sentinela</title>
-<meta name="description" content="Avisos, ocorrências e guias de emergência para Portugal. Gratuito e sem contas.">
-<meta name="theme-color" content="#14213d">
+<meta name="description" content="Alertas oficiais, atividade de emergência, abrigos e guias para Portugal. Gratuito.">
+<meta name="theme-color" content="#121212">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="vendor/leaflet.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Roboto+Mono:wght@500&display=swap">
 <style>
-/* Layout: app de telemóvel — cabeçalho fixo, vistas em coluna única, barra de separadores em baixo */
+/* Layout: app escura de telemóvel — painel de blocos, mapa de ecrã inteiro com fichas em baixo, perfil em lista; 3 separadores */
 :root{
-  --bg:#f3f5f8; --surface:#ffffff; --surface2:#e9edf3; --line:#d5dbe4;
-  --fg:#111a2b; --muted:#5a6578; --accent:#1f4fbf; --accent-fg:#ffffff;
-  --lv-green:#2e8b57; --lv-yellow:#e0b100; --lv-orange:#e86a10; --lv-red:#c81e1e;
-  --lv-yellow-fg:#3a2e00;
-  --fire:#d9480f; --quake:#7b3fbf;
-  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
-  --r:12px; --tabh:64px;
-  color-scheme:light;
+  --bg:#121212; --s1:#1e1e1e; --s2:#2d2d2d; --s3:#3a3a3a; --line:#2f2f2f;
+  --fg:#e6e1e5; --fg2:#cac4d0; --muted:#938f99;
+  --y:#ffeb3b; --y-d:#fbc02d; --y-c:#3b3610; --on-y:#1a1700;
+  --navy:#162036; --navy2:#0f1729;
+  --red:#ff5449; --orange:#ff9800; --amber:#ffd54f; --green:#4caf50; --blue:#4fc3f7; --purple:#b388ff;
+  --font:Roboto,system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Roboto Mono",ui-monospace,monospace;
+  --nav:68px; color-scheme:dark;
 }
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0c111b; --surface:#151c29; --surface2:#1d2636; --line:#2a3548;
-  --fg:#e8edf5; --muted:#97a3b8; --accent:#6f9bff; --accent-fg:#0c111b;
-  --lv-green:#4cc28a; --lv-yellow:#f2cc3a; --lv-orange:#ff8a3d; --lv-red:#ff5a5a;
-  --fire:#ff7a45; --quake:#b98cff; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#0c111b; --surface:#151c29; --surface2:#1d2636; --line:#2a3548;
-  --fg:#e8edf5; --muted:#97a3b8; --accent:#6f9bff; --accent-fg:#0c111b;
-  --lv-green:#4cc28a; --lv-yellow:#f2cc3a; --lv-orange:#ff8a3d; --lv-red:#ff5a5a;
-  --fire:#ff7a45; --quake:#b98cff; color-scheme:dark}
-*{box-sizing:border-box}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased}
-button,input,select{font:inherit;color:inherit}
-a{color:var(--accent)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font);-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--y)}
 [hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--y);outline-offset:2px}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .small{font-size:13px}
+svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+svg.i.s{width:18px;height:18px}
 
-header.top{position:sticky;top:0;z-index:500;background:var(--surface);border-bottom:1px solid var(--line);
-  padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));
-  display:flex;align-items:center;gap:10px}
-.brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.01em;font-size:17px}
-.brand svg{width:24px;height:24px}
-.loc{margin-left:auto;display:flex;align-items:center;gap:6px;min-width:0;background:var(--surface2);border:1px solid var(--line);
-  border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;max-width:55%}
-.loc span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.iconbtn{background:none;border:1px solid var(--line);border-radius:10px;width:36px;height:36px;display:grid;place-items:center;cursor:pointer;flex:none}
-.iconbtn svg{width:18px;height:18px}
-.iconbtn.spin svg{animation:spin 1s linear infinite}
+/* ---------- Estrutura ---------- */
+.screen{min-height:100%;padding:calc(env(safe-area-inset-top,0px) + 12px) max(16px,env(safe-area-inset-right,0px)) calc(var(--nav) + env(safe-area-inset-bottom,0px) + 24px) max(16px,env(safe-area-inset-left,0px));max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+nav.bar{position:fixed;left:0;right:0;bottom:0;z-index:800;background:#1a1a1a;border-top:1px solid var(--line);height:calc(var(--nav) + env(safe-area-inset-bottom,0px));padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);display:grid;grid-template-columns:repeat(3,1fr)}
+nav.bar button{background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer}
+nav.bar button .pillic{width:64px;height:32px;border-radius:16px;display:grid;place-items:center;transition:background .2s}
+nav.bar button[aria-current="page"]{color:var(--fg)}
+nav.bar button[aria-current="page"] .pillic{background:var(--y-c);color:var(--y)}
+
+/* ---------- Topo do painel ---------- */
+.dhead{display:flex;align-items:center;gap:10px}
+.dhead h1{font-size:26px;font-weight:900;margin:0;letter-spacing:-.01em}
+.dhead .sp{flex:1}
+.rbtn{width:40px;height:40px;border-radius:20px;border:0;background:var(--s1);display:grid;place-items:center;cursor:pointer;color:var(--fg)}
+.rbtn.spin svg{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.iconbtn.spin svg{animation:none}}
+@media (prefers-reduced-motion:reduce){.rbtn.spin svg{animation:none}}
+.places{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:0 max(16px,env(safe-area-inset-left,0px))}
+.places::-webkit-scrollbar{display:none}
+.chip{flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--s3);background:transparent;border-radius:8px;padding:7px 12px;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;color:var(--fg2)}
+.chip[aria-pressed="true"]{background:var(--y-c);border-color:transparent;color:var(--y)}
+.chip.add{border-style:dashed}
+.banner{border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;background:var(--s1)}
+.banner.y{background:var(--y-c);color:#fff8c4}
+.banner .b-t{font-weight:700}
+.banner .b-s{font-size:13.5px;color:var(--fg2);margin-top:2px}
+.banner.y .b-s{color:#f1e7a2}
+.banner .acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 
-main{padding:14px max(16px,env(safe-area-inset-right,0px)) calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 20px) max(16px,env(safe-area-inset-left,0px));max-width:760px;margin:0 auto}
-.view{display:flex;flex-direction:column;gap:14px}
-#v-mapa{position:fixed;inset:0;padding:0;max-width:none}
-#map{position:absolute;left:0;right:0;bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px));top:0}
+/* ---------- Blocos ---------- */
+.w{background:var(--s1);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.wh{display:flex;align-items:center;gap:10px}
+.wh h2{margin:0;font-size:17px;font-weight:700;flex:1;min-width:0}
+.wh .lnk{background:none;border:0;color:var(--y);font-weight:500;font-size:14px;cursor:pointer;padding:4px 0}
+.tag{display:inline-flex;align-items:center;gap:4px;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.tag.live{background:var(--red);color:#fff}
+.tag.off{background:var(--y);color:var(--on-y)}
+.tag.urg{background:#5c1612;color:#ffb4ab}
+.tag.g{background:var(--s2);color:var(--fg2)}
+.btn{border:0;border-radius:20px;padding:10px 18px;font-weight:500;font-size:14px;cursor:pointer;background:var(--s2);color:var(--fg);display:inline-flex;align-items:center;gap:8px;justify-content:center}
+a.btn{text-decoration:none}
+.btn.y{background:var(--y);color:var(--on-y)}
+.btn.t{background:transparent;color:var(--y);padding:10px 8px}
+.btn.o{background:transparent;border:1px solid var(--s3)}
+.btn.full{width:100%}
 
-nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:600;background:var(--surface);border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(5,1fr);height:calc(var(--tabh) + env(safe-area-inset-bottom,0px));
-  padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
-nav.tabs button{background:none;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:11.5px;color:var(--muted);cursor:pointer;position:relative}
-nav.tabs button svg{width:22px;height:22px}
-nav.tabs button[aria-current="page"]{color:var(--accent);font-weight:600}
-nav.tabs .badge{position:absolute;top:8px;left:calc(50% + 6px);min-width:17px;height:17px;border-radius:9px;background:var(--lv-red);color:#fff;font-size:10.5px;display:grid;place-items:center;padding:0 4px;font-weight:700}
+.clear{display:flex;gap:14px;align-items:center;padding:4px 0}
+.clear .ok{width:44px;height:44px;border-radius:22px;background:#173d1c;color:var(--green);display:grid;place-items:center;flex:none}
+.clear b{display:block;font-size:15.5px}
+.alert{border-radius:14px;background:var(--s2);padding:12px 14px;display:flex;gap:12px;cursor:pointer;border:0;text-align:left;width:100%}
+.alert .lv{width:6px;border-radius:3px;background:var(--lc);flex:none}
+.alert .at{font-weight:700}
+.alert .as{font-size:13px;color:var(--fg2)}
+.alert .ap{font-size:12.5px;color:var(--muted);font-family:var(--mono);margin-top:2px}
 
-h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:6px 0 0;font-weight:600}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
-.card h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:8px}
-.card h3 .src{margin-left:auto;font-size:11px;font-weight:500;color:var(--muted)}
-.muted{color:var(--muted)}
-.small{font-size:13px}
-.err{color:var(--lv-red);font-size:13px}
+.act{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line);cursor:pointer;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;width:100%}
+.act:first-of-type{border-top:0;padding-top:0}
+.ai{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--ac-bg);color:var(--ac)}
+.am{min-width:0;flex:1}
+.am .t{font-weight:600;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.am .s,.am .m{display:block}
+.am .s{font-size:13px;color:var(--fg2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.am .m{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.ar{text-align:right;font-size:12.5px;color:var(--muted);white-space:nowrap;font-family:var(--mono)}
 
-/* Estado geral */
-.status{border-radius:var(--r);padding:16px;display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);background:var(--surface);position:relative;overflow:hidden}
-.status::before{content:"";position:absolute;inset:0 auto 0 0;width:6px;background:var(--lvc,var(--lv-green))}
-.status .lvl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--lvc,var(--lv-green))}
-.status .big{font-size:20px;font-weight:700;line-height:1.25;text-wrap:balance;margin-top:2px}
-.status .sub{color:var(--muted);font-size:13.5px;margin-top:4px}
-.dot{width:12px;height:12px;border-radius:50%;background:var(--lvc,var(--lv-green));flex:none;margin-top:5px;box-shadow:0 0 0 4px color-mix(in srgb,var(--lvc,var(--lv-green)) 22%,transparent)}
+.stories{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+.stories::-webkit-scrollbar{display:none}
+.story{flex:none;width:220px;border-radius:16px;padding:12px;background:linear-gradient(160deg,var(--st1),var(--st2));border:0;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:8px;min-height:132px;color:#fff}
+.story .st-t{font-weight:700;font-size:15px;line-height:1.3;text-wrap:balance}
+.story .st-s{font-size:12px;opacity:.85;margin-top:auto}
 
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media (max-width:420px){.grid2{grid-template-columns:1fr}}
-.metric{display:flex;align-items:baseline;gap:6px}
-.metric .v{font-size:30px;font-weight:600;font-family:var(--mono);letter-spacing:-.02em}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13.5px;margin-top:6px}
-.kv dt{color:var(--muted)} .kv dd{margin:0;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.mini{position:relative;height:190px;border-radius:14px;overflow:hidden;background:var(--s2);cursor:pointer}
+.mini .mm{position:absolute;inset:0}
+.mini .cnts{position:absolute;left:10px;bottom:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:500}
+.mini .cnts span{background:rgba(18,18,18,.88);border-radius:8px;padding:4px 8px;font-size:12px;font-weight:500}
 
-.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;background:var(--surface2);border:1px solid var(--line)}
-.pill.c{background:var(--pc);border-color:transparent;color:#fff}
-.pill.c.yl{color:var(--lv-yellow-fg)}
+.wx{display:flex;align-items:center;gap:14px}
+.wx .tmp{font-size:44px;font-weight:300;letter-spacing:-.03em;line-height:1}
+.fc{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;font-size:12px}
+.fc div{background:var(--s2);border-radius:10px;padding:8px 2px;display:flex;flex-direction:column;gap:3px;align-items:center}
+.fc b{font-weight:600;font-size:13px}
+.fc .ic{font-size:0}
+.env{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.env div{background:var(--s2);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px}
+.env .k{font-size:11.5px;color:var(--muted)}
+.env .v{font-size:18px;font-weight:700}
+.env .q{font-size:12px;font-weight:500;color:var(--qc)}
+.svc{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.svc a{background:var(--s2);border-radius:12px;padding:10px 4px;text-decoration:none;color:var(--fg);text-align:center;font-size:12.5px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:6px}
+.svc a i{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-style:normal;font-weight:900;font-size:12px;color:#fff;background:var(--sc)}
+@media (max-width:380px){.svc{grid-template-columns:repeat(3,1fr)}}
+.err{color:#ffb4ab;font-size:13px}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+.foot{font-size:12px;color:var(--muted);line-height:1.6}
 
-.rcm{display:flex;gap:4px;margin-top:8px}
-.rcm i{flex:1;height:8px;border-radius:3px;background:var(--surface2)}
-.rcm i.on{background:var(--pc)}
+/* ---------- Mapa ---------- */
+#v-mapa{position:fixed;inset:0;z-index:1}
+#map{position:absolute;inset:0;background:#0e0e0e}
+.mtop{position:absolute;z-index:600;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 10px) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.msearch{pointer-events:auto;display:flex;align-items:center;gap:10px;background:var(--s1);border-radius:28px;padding:0 6px 0 16px;height:52px;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+.msearch input{flex:1;min-width:0;background:none;border:0;outline:none;font-size:15.5px;height:100%}
+.msearch input::placeholder{color:var(--muted)}
+.modes{pointer-events:auto;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.modes::-webkit-scrollbar{display:none}
+.modes .chip{background:var(--s1);border-color:var(--s1);box-shadow:0 1px 6px rgba(0,0,0,.4);color:var(--fg)}
+.modes .chip[aria-pressed="true"]{background:var(--y);color:var(--on-y)}
+.sres{pointer-events:auto;background:var(--s1);border-radius:16px;max-height:50vh;overflow:auto;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+.sres button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:12px 16px;cursor:pointer}
+.sres button:first-child{border-top:0}
+.mfab{position:absolute;z-index:600;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(var(--nav) + env(safe-area-inset-bottom,0px) + 16px);display:flex;flex-direction:column;gap:10px}
+.mfab button{width:48px;height:48px;border-radius:16px;border:0;background:var(--s1);color:var(--fg);display:grid;place-items:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;font-weight:700;font-size:12px}
+.mlegend{position:absolute;z-index:600;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(var(--nav) + env(safe-area-inset-bottom,0px) + 16px);background:rgba(30,30,30,.92);border-radius:12px;padding:6px 10px;font-size:12px;color:var(--fg2);max-width:60%}
+.leaflet-container{background:#0e0e0e;font-family:var(--font)}
+.leaflet-control-attribution{background:rgba(18,18,18,.7)!important;color:#888!important;font-size:10px!important}
+.leaflet-control-attribution a{color:#aaa!important}
+.leaflet-control-zoom{display:none}
+.pin{width:30px;height:30px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #121212;box-shadow:0 1px 4px rgba(0,0,0,.6)}
+.pin>*{transform:rotate(45deg)}
+.dotm{border-radius:50%;border:2px solid #121212;box-shadow:0 0 0 2px var(--dc);display:grid;place-items:center;color:#121212;font:900 10px/1 var(--font)}
+.clus{background:#ff5722;color:#fff;border-radius:50%;display:grid;place-items:center;font:700 12px var(--font);border:2px solid #121212}
 
-ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
-ul.list li{padding:10px 0;border-top:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}
-ul.list li:first-child{border-top:0;padding-top:2px}
-.li-ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;flex:none;font-weight:700;font-size:12px;font-family:var(--mono)}
-.li-main{min-width:0;flex:1}
-.li-t{font-weight:600}
-.li-s{font-size:13px;color:var(--muted)}
-.li-r{font-family:var(--mono);font-size:13px;color:var(--muted);white-space:nowrap}
+/* ---------- Ficha (bottom sheet) ---------- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:901;background:var(--s1);border-radius:24px 24px 0 0;max-height:82vh;overflow:auto;padding:8px max(18px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 20px) max(18px,env(safe-area-inset-left,0px));max-width:720px;margin:0 auto;animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:.4}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.grab{width:36px;height:4px;border-radius:2px;background:var(--s3);margin:4px auto 14px}
+.sheet h3{margin:6px 0 4px;font-size:21px;font-weight:700;line-height:1.25;text-wrap:balance}
+.sheet .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px;margin:12px 0}
+.sheet .kv dt{color:var(--muted)} .sheet .kv dd{margin:0}
+.sheet .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.sheet p{color:var(--fg2);margin:8px 0}
 
-/* Avisos */
-.seg{display:flex;background:var(--surface2);border-radius:10px;padding:3px;gap:3px}
-.seg button{flex:1;border:0;background:none;border-radius:8px;padding:8px;cursor:pointer;font-weight:500;color:var(--muted)}
-.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
-.chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
-.chip[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--fg)}
-.chip i{width:10px;height:10px;border-radius:50%;background:var(--pc)}
-.warn{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
-.warn:first-of-type{border-top:0}
-.warn .bar{width:5px;border-radius:3px;background:var(--pc);flex:none}
-.warn .t{font-weight:600}
-.warn .p{font-size:13px;color:var(--muted);font-family:var(--mono)}
-.warn .x{font-size:14px;margin-top:4px}
-.area-h{display:flex;align-items:center;gap:8px}
-.area-h .n{font-weight:700;font-size:16px}
+/* ---------- Perfil e páginas ---------- */
+.ptitle{display:flex;align-items:center;gap:8px}
+.ptitle h1{font-size:26px;font-weight:900;margin:0}
+.back{background:none;border:0;color:var(--fg);width:40px;height:40px;border-radius:20px;display:grid;place-items:center;cursor:pointer;margin-left:-8px}
+.group{background:var(--s1);border-radius:20px;overflow:hidden}
+.gtitle{font-size:13px;font-weight:500;color:var(--y);margin:8px 4px -6px;letter-spacing:.02em}
+.item{display:flex;align-items:center;gap:14px;padding:14px 16px;width:100%;background:none;border:0;border-top:1px solid var(--line);text-align:left;cursor:pointer;color:var(--fg)}
+.group>.item:first-child,.group>:first-child{border-top:0}
+.item .ii{width:40px;height:40px;border-radius:12px;background:var(--s2);display:grid;place-items:center;flex:none;color:var(--y)}
+.item .it{flex:1;min-width:0}
+.item .it b{display:block;font-weight:500;font-size:15.5px}
+.item .it span{font-size:13px;color:var(--muted)}
+.item .iv{color:var(--muted);font-size:14px}
+.item.danger{color:#ffb4ab} .item.danger .ii{color:#ffb4ab}
+.sw{appearance:none;width:52px;height:32px;border-radius:16px;background:var(--s3);position:relative;cursor:pointer;flex:none;transition:background .15s;border:2px solid var(--s3)}
+.sw::after{content:"";position:absolute;top:4px;left:4px;width:20px;height:20px;border-radius:50%;background:var(--muted);transition:all .15s}
+.sw:checked{background:var(--y);border-color:var(--y)}
+.sw:checked::after{left:24px;width:24px;height:24px;top:2px;background:var(--on-y)}
+.ffoot{font-size:12.5px;color:var(--muted);padding:0 6px;margin-top:-8px}
+select.sel,input.inp{background:var(--s2);border:0;border-radius:12px;padding:10px 12px;color:var(--fg);max-width:55%}
+input.inp{max-width:100%;width:100%}
+.guide h1{font-size:28px;font-weight:900;margin:0;text-wrap:balance}
+.guide .lead{color:var(--fg2);font-size:16px}
+.guide .key{background:var(--y);color:var(--on-y);border-radius:16px;padding:14px 16px;font-weight:700;font-size:16px}
+.guide ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;color:var(--fg2)}
+.guide h4{margin:0;font-size:16px}
+.kit li{list-style:none;margin-left:-20px;display:flex;gap:12px;align-items:flex-start}
+.kit input[type=checkbox]{width:22px;height:22px;accent-color:var(--y);flex:none;margin:0}
+.kit .rm{margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer}
+.prog{height:8px;border-radius:4px;background:var(--s2);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--y);border-radius:4px}
+.nums{display:grid;grid-template-columns:1fr auto;gap:10px 12px;align-items:center}
+.nums b{font-family:var(--mono);font-size:17px;color:var(--y)}
+.custom li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line);list-style:none}
+.custom li:first-child{border-top:0}
+.custom{padding:0 16px;margin:0}
+.custom .mv{background:var(--s2);border:0;border-radius:8px;width:34px;height:34px;cursor:pointer;color:var(--fg)}
 
-/* Guias */
-.guides{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media (max-width:420px){.guides{grid-template-columns:1fr}}
-.gbtn{text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;cursor:pointer;display:flex;gap:12px;align-items:center}
-.gbtn .gi{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:var(--surface2);flex:none}
-.gbtn .gi svg{width:22px;height:22px}
-.gbtn b{display:block}
-.gbtn span{font-size:12.5px;color:var(--muted)}
-.guide h1{font-size:24px;margin:4px 0 4px;text-wrap:balance}
-.guide h4{margin:16px 0 6px;font-size:15px}
-.guide ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px}
-.guide .lead{font-size:16px;color:var(--muted);max-width:62ch}
-.guide .key{background:var(--surface2);border-radius:10px;padding:12px 14px;font-weight:600;font-size:16px}
-.check li{list-style:none;margin-left:-20px;display:flex;gap:10px;align-items:flex-start}
-.check input{width:20px;height:20px;margin:1px 0 0;accent-color:var(--accent);flex:none}
-.back{background:none;border:0;color:var(--accent);font-weight:600;cursor:pointer;padding:4px 0;display:inline-flex;gap:4px;align-items:center}
-.nums{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center}
-.nums b{font-family:var(--mono);font-size:17px}
-
-/* Definições */
-.field{display:flex;flex-direction:column;gap:6px}
-.field label{font-weight:600;font-size:14px}
-.field .hint{font-size:12.5px;color:var(--muted)}
-input[type=text],input[type=url],select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 14px;cursor:pointer;font-weight:600}
-.btn.pri{background:var(--accent);color:var(--accent-fg);border-color:transparent}
-.switch{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0}
-.switch input{width:44px;height:24px;accent-color:var(--accent)}
-.results button{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 2px;cursor:pointer}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
-/* Mapa */
-.mapctl{position:absolute;z-index:450;top:calc(env(safe-area-inset-top,0px) + 70px);right:max(10px,env(safe-area-inset-right,0px));background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:4px;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.15);max-width:210px}
-.mapctl label{display:flex;gap:8px;align-items:center;cursor:pointer;padding:3px 0}
-.mapctl input{accent-color:var(--accent)}
-.mapctl .btn{padding:6px 10px;font-size:12.5px;margin-top:4px}
-.maplegend{position:absolute;z-index:450;left:max(10px,env(safe-area-inset-left,0px));bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 12px);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:12px;color:var(--muted)}
-.leaflet-popup-content{font:13.5px/1.4 var(--font)}
-.leaflet-popup-content b{font-size:14px}
-.leaflet-container{background:var(--surface2)}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 14px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:900;max-width:calc(100% - 32px)}
-.empty{padding:18px;text-align:center;color:var(--muted);font-size:14px}
-footer.src{font-size:12px;color:var(--muted);line-height:1.6}
+/* ---------- Início guiado ---------- */
+#onb{position:fixed;inset:0;z-index:2000;background:var(--navy);display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top,0px) + 12px) max(24px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 24px) max(24px,env(safe-area-inset-left,0px))}
+#onb .skip{align-self:flex-end;background:none;border:0;color:var(--fg2);font-weight:500;padding:8px;cursor:pointer}
+#onb .art{flex:1;display:grid;place-items:center;min-height:0}
+#onb .art svg{width:min(88vw,380px);height:auto;max-height:44vh}
+#onb h1{font-size:34px;font-weight:900;line-height:1.08;margin:0 0 10px;white-space:pre-line;letter-spacing:-.01em}
+#onb p{color:#c5cbe0;font-size:16px;margin:0 0 18px;max-width:46ch}
+#onb .dots{display:flex;gap:6px;margin-bottom:18px}
+#onb .dots i{width:8px;height:8px;border-radius:4px;background:#3a4669}
+#onb .dots i.on{width:24px;background:var(--y)}
+#onb .ochips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+#onb .ochips span{border:1px solid #3a4669;border-radius:8px;padding:6px 10px;font-size:13px;color:#dfe4f5}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav) + env(safe-area-inset-bottom,0px) + 16px);background:#e6e1e5;color:#1c1b1f;padding:12px 18px;border-radius:12px;font-size:14px;z-index:3000;max-width:calc(100% - 32px);box-shadow:0 4px 14px rgba(0,0,0,.5)}
 </style>
 </head>
 <body>
-<header class="top">
-  <div class="brand">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M12 8v5"/><circle cx="12" cy="16.5" r=".6" fill="currentColor"/></svg>
-    Sentinela
+
+<!-- ================= PAINEL ================= -->
+<section id="v-painel" class="screen">
+  <div class="dhead">
+    <h1>Sentinela</h1><span class="sp"></span>
+    <button class="rbtn" id="refreshBtn" aria-label="Atualizar"><svg class="i s" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg></button>
+    <button class="rbtn" id="customBtn" aria-label="Personalizar painel"><svg class="i s" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
   </div>
-  <button class="loc" id="locBtn" aria-label="Alterar localização">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
-    <span id="locName">A localizar…</span>
-  </button>
-  <button class="iconbtn" id="refreshBtn" aria-label="Atualizar dados">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>
-  </button>
-</header>
-
-<main>
-<!-- INÍCIO -->
-<section class="view" id="v-inicio">
-  <div class="status" id="statusCard"><div class="dot"></div><div><div class="lvl">A carregar</div><div class="big">A ler os avisos oficiais…</div><div class="sub" id="statusSub"></div></div></div>
-
-  <div class="grid2">
-    <div class="card" id="wxCard"><h3>Tempo agora <span class="src">Open-Meteo</span></h3><div class="muted small">A carregar…</div></div>
-    <div class="card" id="aqCard"><h3>Qualidade do ar <span class="src">CAMS</span></h3><div class="muted small">A carregar…</div></div>
-  </div>
-
-  <div class="card" id="rcmCard"><h3>Risco de incêndio rural <span class="src">IPMA</span></h3><div class="muted small">A carregar…</div></div>
-
-  <div class="card" id="fireCard"><h3>Ocorrências perto de si <span class="src">ANEPC via fogos.pt</span></h3><div class="muted small">A carregar…</div></div>
-
-  <div class="card" id="quakeCard"><h3>Sismos recentes <span class="src">IPMA</span></h3><div class="muted small">A carregar…</div></div>
-
-  <footer class="src" id="lastUpd"></footer>
+  <div class="places" id="places"></div>
+  <div id="offlineBanner" class="banner" hidden><svg class="i" viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 4.2-2.6M10.7 5a15 15 0 0 1 11.3 3.8M5 12.9a10 10 0 0 1 5.2-2.8M19 12.9a10 10 0 0 0-2.6-1.9M8.5 16.4a5 5 0 0 1 7 0M12 20h0M2 2l20 20"/></svg><div><div class="b-t">Está offline</div><div class="b-s">A mostrar dados guardados. Ligue-se para atualizar.</div></div></div>
+  <div id="notifBanner" class="banner y" hidden><svg class="i" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><div style="flex:1"><div class="b-t">Receba os alertas de emergência</div><div class="b-s">Seja avisado quando houver um alerta perto de si.</div><div class="acts"><button class="btn y" id="nbOn">Ativar notificações</button><button class="btn t" id="nbOff">Agora não</button></div></div></div>
+  <div id="widgets" style="display:flex;flex-direction:column;gap:16px"></div>
+  <div class="foot" id="lastUpd"></div>
 </section>
 
-<!-- AVISOS -->
-<section class="view" id="v-avisos" hidden>
-  <div class="seg" role="group" aria-label="Âmbito">
-    <button id="scMine" aria-pressed="true">O meu distrito</button>
-    <button id="scAll" aria-pressed="false">Todo o país</button>
-  </div>
-  <div class="chips" id="lvlChips"></div>
-  <div id="warnList"></div>
-  <h2>Histórico neste dispositivo</h2>
-  <div class="card" id="histCard"></div>
-  <footer class="src">Fonte: Instituto Português do Mar e da Atmosfera (IPMA), avisos meteorológicos até 3 dias. Confirme sempre em <a href="https://www.ipma.pt/pt/otempo/prev-sam/" target="_blank" rel="noopener">ipma.pt</a> e <a href="https://prociv.gov.pt" target="_blank" rel="noopener">prociv.gov.pt</a>.</footer>
-</section>
-
-<!-- MAPA -->
-<section class="view" id="v-mapa" hidden>
+<!-- ================= MAPA ================= -->
+<section id="v-mapa" hidden>
   <div id="map" role="region" aria-label="Mapa"></div>
-  <div class="mapctl" id="mapctl">
-    <label><input type="checkbox" id="lyFire" checked> Ocorrências ANEPC</label>
-    <label><input type="checkbox" id="lyQuake" checked> Sismos (30 dias)</label>
-    <label><input type="checkbox" id="lyRadar"> Radar de chuva</label>
-    <label><input type="checkbox" id="lyRcm"> Risco de incêndio hoje</label>
-    <label><input type="checkbox" id="lyPoi"> Hospitais, bombeiros, polícia</label>
-    <button class="btn" id="poiBtn" hidden>Procurar nesta zona</button>
+  <div class="mtop">
+    <div class="msearch"><svg class="i s muted" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="mq" type="search" placeholder="Pesquisar cidades, alertas, abrigos" autocomplete="off" aria-label="Pesquisar"><button class="rbtn" id="mqClear" hidden aria-label="Limpar"><svg class="i s" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="sres" id="sres" hidden></div>
+    <div class="modes" id="modes"></div>
   </div>
-  <div class="maplegend" id="mapLegend">Toque num ponto para ver detalhes</div>
+  <div class="mfab">
+    <button id="styleBtn" aria-label="Estilo do mapa"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></button>
+    <button id="meBtn" aria-label="A minha localização"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/></svg></button>
+  </div>
+  <div class="mlegend" id="mlegend"></div>
 </section>
 
-<!-- GUIAS -->
-<section class="view" id="v-guias" hidden>
-  <div id="guideIndex" class="view">
-    <h2>Preparar e agir</h2>
-    <div class="guides" id="guideGrid"></div>
-    <h2>Números úteis</h2>
-    <div class="card nums" id="numsCard"></div>
-    <footer class="src">Conteúdo de orientação geral baseado nas recomendações públicas da Autoridade Nacional de Emergência e Proteção Civil (ANEPC). Em caso de emergência, siga sempre as indicações das autoridades no local. Mais em <a href="https://prociv.gov.pt" target="_blank" rel="noopener">prociv.gov.pt</a>.</footer>
-  </div>
-  <article id="guideView" class="guide view" hidden></article>
-</section>
+<!-- ================= PERFIL ================= -->
+<section id="v-perfil" class="screen" hidden></section>
 
-<!-- DEFINIÇÕES -->
-<section class="view" id="v-def" hidden>
-  <div class="card view">
-    <div class="field">
-      <label>Localização</label>
-      <div class="row"><button class="btn pri" id="gpsBtn">Usar a minha localização</button></div>
-      <input type="text" id="placeQ" placeholder="Ou pesquise uma localidade (ex.: Leiria, Pombal…)" autocomplete="off">
-      <div class="results" id="placeRes"></div>
-      <div class="hint" id="placeNow"></div>
-    </div>
-    <div class="field">
-      <label for="distSel">Área de avisos IPMA</label>
-      <select id="distSel"></select>
-      <div class="hint">Escolhida automaticamente pela localização. Pode fixar outra.</div>
-    </div>
-    <div class="field">
-      <label for="radSel">Raio para ocorrências e sismos</label>
-      <select id="radSel"><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option><option value="100">100 km</option><option value="200">200 km</option></select>
-    </div>
-  </div>
-
-  <div class="card view">
-    <div class="field">
-      <label>Notificações</label>
-      <div class="hint">Funcionam enquanto a app estiver aberta ou em segundo plano recente. O Android pode suspender apps web fechadas, por isso não substituem os alertas oficiais por SMS/cell broadcast.</div>
-    </div>
-    <div class="switch"><span>Avisos meteorológicos do meu distrito</span><input type="checkbox" id="nWarn"></div>
-    <div class="field">
-      <label for="minLvl">Nível mínimo para notificar</label>
-      <select id="minLvl"><option value="yellow">Amarelo e acima</option><option value="orange">Laranja e acima</option><option value="red">Só vermelho</option></select>
-    </div>
-    <div class="switch"><span>Novas ocorrências dentro do raio</span><input type="checkbox" id="nFire"></div>
-    <div class="switch"><span>Sismos M3+ dentro do raio</span><input type="checkbox" id="nQuake"></div>
-    <div class="row"><button class="btn" id="testNotif">Testar notificação</button><span class="small muted" id="notifState"></span></div>
-  </div>
-
-  <div class="card view">
-    <div class="field">
-      <label for="themeSel">Aspeto</label>
-      <select id="themeSel"><option value="">Igual ao sistema</option><option value="light">Claro</option><option value="dark">Escuro</option></select>
-    </div>
-    <div class="field">
-      <label for="proxyIn">Proxy (opcional, avançado)</label>
-      <input type="url" id="proxyIn" placeholder="https://o-seu-servidor/proxy?url=">
-      <div class="hint">Só é preciso se alguma fonte bloquear pedidos diretos do browser. O endereço da fonte é acrescentado no fim.</div>
-    </div>
-    <div class="row"><button class="btn" id="clearBtn">Apagar dados guardados</button></div>
-  </div>
-
-  <footer class="src">
-    <b>Sentinela</b> é gratuita, sem contas e sem publicidade. A localização fica só no seu dispositivo e é usada para pedir dados às fontes públicas abaixo.<br>
-    Fontes: <a href="https://api.ipma.pt" target="_blank" rel="noopener">IPMA</a> (avisos, sismos, risco de incêndio) ·
-    <a href="https://fogos.pt" target="_blank" rel="noopener">fogos.pt</a> (ocorrências publicadas pela ANEPC) ·
-    <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (tempo e qualidade do ar) ·
-    <a href="https://www.rainviewer.com/api.html" target="_blank" rel="noopener">RainViewer</a> (radar) ·
-    <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> (mapa e pontos úteis).<br>
-    Não é um serviço oficial. Em emergência ligue <b>112</b>.
-  </footer>
-</section>
-</main>
-
-<nav class="tabs" aria-label="Secções">
-  <button data-v="inicio" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 10.5L12 4l8 6.5V20H4z"/><path d="M10 20v-5h4v5"/></svg>Início</button>
-  <button data-v="avisos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3L2 20h20z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>Avisos<span class="badge" id="warnBadge" hidden></span></button>
-  <button data-v="mapa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>Mapa</button>
-  <button data-v="guias"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/><path d="M12 7v6M9 10h6"/></svg>Guias</button>
-  <button data-v="def"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Definições</button>
+<nav class="bar" aria-label="Secções">
+  <button data-v="painel" aria-current="page"><span class="pillic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg></span>Painel</button>
+  <button data-v="mapa"><span class="pillic"><svg class="i" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg></span>Mapa</button>
+  <button data-v="perfil"><span class="pillic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>Perfil</button>
 </nav>
 
+<div id="sheetWrap" hidden><div class="scrim" id="scrim"></div><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div id="onb" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="vendor/leaflet.js"></script>
 <script>
 "use strict";
-/* ============ Configuração e armazenamento ============ */
+/* ======================================================================
+   SENTINELA — dados, estado e utilitários
+   ====================================================================== */
 const LS = {
-  get(k, d){ try{ const v = localStorage.getItem("sent:"+k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } },
-  set(k, v){ try{ localStorage.setItem("sent:"+k, JSON.stringify(v)); }catch(e){} },
+  get(k,d){ try{ const v=localStorage.getItem("sent:"+k); return v==null?d:JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem("sent:"+k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem("sent:"+k); }catch(e){} },
   clear(){ try{ Object.keys(localStorage).filter(k=>k.startsWith("sent:")).forEach(k=>localStorage.removeItem(k)); }catch(e){} }
 };
-const DEF = { lat:39.7436, lon:-8.8071, place:"Leiria", area:"", areaAuto:true, radius:50,
-  nWarn:true, nFire:false, nQuake:true, minLvl:"yellow", proxy:"", theme:"" };
-let cfg = Object.assign({}, DEF, LS.get("cfg", {}));
-const saveCfg = () => LS.set("cfg", cfg);
+const WIDGETS = [
+  ["alertas","Alertas perto de si"],["atividade","Atividade de emergência"],["ultimahora","Última hora"],
+  ["minimapa","Mapa da zona"],["tempo","Tempo e previsão"],["ambiente","Ambiente"],["falhas","Falhas de serviços"],["sismos","Sismos"]
+];
+const DEF = {
+  me:{ lat:39.7436, lon:-8.8071, name:"Leiria" }, gps:false, cities:[], sel:"me",
+  layout: WIDGETS.map(w=>({ id:w[0], on:true })),
+  nAlerts:true, nMinLvl:"yellow", nTypes:{ meteo:true, incendio:true, sismo:true, ar:false, luz:false }, nDist:50,
+  quiet:false, qFrom:"23:00", qTo:"07:00", nAct:false, nActR:10, breakingDash:true,
+  radius:50, temp:"C", proxy:"", onboarded:false, nbDismissed:false
+};
+let cfg = deepMerge(structuredClone(DEF), LS.get("cfg", {}));
+function deepMerge(a,b){ for(const k in b){ if(b[k] && typeof b[k]==="object" && !Array.isArray(b[k]) && a[k] && typeof a[k]==="object") deepMerge(a[k],b[k]); else a[k]=b[k]; } return a; }
+// novos blocos de versões futuras entram no fim da disposição
+WIDGETS.forEach(([id])=>{ if(!cfg.layout.find(x=>x.id===id)) cfg.layout.push({ id, on:true }); });
+const save = () => LS.set("cfg", cfg);
 
-/* Áreas de aviso IPMA (código → nome, coordenadas aproximadas da sede) */
 const AREAS = {
   VCT:["Viana do Castelo",41.693,-8.832], BRG:["Braga",41.545,-8.427], VRL:["Vila Real",41.300,-7.745], BGC:["Bragança",41.806,-6.757],
   PTO:["Porto",41.150,-8.611], AVR:["Aveiro",40.640,-8.654], VIS:["Viseu",40.657,-7.913], GDA:["Guarda",40.537,-7.268],
@@ -341,466 +301,693 @@ const AREAS = {
   MCN:["Madeira – Costa Norte",32.83,-16.95], MCS:["Madeira – Costa Sul",32.65,-16.92], MRM:["Madeira – Regiões Montanhosas",32.75,-16.97], MPS:["Porto Santo",33.07,-16.34],
   AOR:["Açores – Grupo Oriental",37.75,-25.67], ACE:["Açores – Grupo Central",38.65,-27.22], AOC:["Açores – Grupo Ocidental",39.45,-31.13]
 };
-const LVL = { green:0, yellow:1, orange:2, red:3 };
-const LVLNAME = { green:"Verde", yellow:"Amarelo", orange:"Laranja", red:"Vermelho" };
-const LVLVAR = { green:"var(--lv-green)", yellow:"var(--lv-yellow)", orange:"var(--lv-orange)", red:"var(--lv-red)" };
-const TYPEPT = { "Precipitação":"Precipitação", "Vento":"Vento", "Agitação Marítima":"Agitação marítima", "Nevoeiro":"Nevoeiro",
-  "Tempo Quente":"Tempo quente", "Tempo Frio":"Tempo frio", "Neve":"Neve", "Trovoada":"Trovoada" };
+const LVL={green:0,yellow:1,orange:2,red:3};
+const LVN={green:"Verde",yellow:"Amarelo",orange:"Laranja",red:"Vermelho"};
+const LVSEV={yellow:"Moderado",orange:"Grave",red:"Extremo"};
+const LVC={green:"#4caf50",yellow:"#ffd54f",orange:"#ff9800",red:"#ff5449"};
+const TYPEPT={"Precipitação":"Precipitação","Vento":"Vento","Agitação Marítima":"Agitação marítima","Nevoeiro":"Nevoeiro","Tempo Quente":"Tempo quente","Tempo Frio":"Tempo frio","Neve":"Neve","Trovoada":"Trovoada"};
 
-/* ============ Utilitários ============ */
-const $ = s => document.querySelector(s);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
-const km = (a,b,c,d) => { const R=6371, r=Math.PI/180, x=(c-a)*r, y=(d-b)*r;
-  const h=Math.sin(x/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
-const fmtKm = d => d < 10 ? d.toFixed(1).replace(".",",")+" km" : Math.round(d)+" km";
-const num = (v,dp=0) => v==null || isNaN(v) ? "—" : Number(v).toFixed(dp).replace(".",",");
-const DF = new Intl.DateTimeFormat("pt-PT",{ weekday:"short", day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" });
-const TF = new Intl.DateTimeFormat("pt-PT",{ hour:"2-digit", minute:"2-digit" });
-const fmtDT = d => d && !isNaN(d) ? DF.format(d) : "—";
-function ago(d){ if(!d||isNaN(d)) return ""; const m=Math.round((Date.now()-d)/60000);
-  if(m<1) return "agora"; if(m<60) return "há "+m+" min"; const h=Math.round(m/60); if(h<48) return "há "+h+" h"; return "há "+Math.round(h/24)+" dias"; }
-function toast(t){ const el=$("#toast"); el.textContent=t; el.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>el.hidden=true,2800); }
-function nearestArea(lat,lon){ let best=null, bd=1e9; for(const [k,v] of Object.entries(AREAS)){ const d=km(lat,lon,v[1],v[2]); if(d<bd){bd=d;best=k;} } return best; }
-function myArea(){ return cfg.areaAuto || !cfg.area ? nearestArea(cfg.lat,cfg.lon) : cfg.area; }
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const km=(a,b,c,d)=>{const R=6371,r=Math.PI/180,x=(c-a)*r,y=(d-b)*r;const h=Math.sin(x/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(h));};
+const fKm=d=>d<10?d.toFixed(1).replace(".",",")+" km":Math.round(d)+" km";
+const num=(v,dp=0)=>v==null||isNaN(v)?"—":Number(v).toFixed(dp).replace(".",",");
+const DF=new Intl.DateTimeFormat("pt-PT",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+const TF=new Intl.DateTimeFormat("pt-PT",{hour:"2-digit",minute:"2-digit"});
+const WDF=new Intl.DateTimeFormat("pt-PT",{weekday:"short"});
+const fDT=d=>d&&!isNaN(d)?DF.format(d):"—";
+function ago(d){ if(!d||isNaN(d)) return ""; const m=Math.round((Date.now()-d)/60000); if(m<1) return "Agora mesmo"; if(m<60) return "há "+m+" min"; const h=Math.round(m/60); if(h<48) return "há "+h+" h"; return "há "+Math.round(h/24)+" dias"; }
+const T=c=>cfg.temp==="F"?Math.round(c*9/5+32)+"°":Math.round(c)+"°";
+function toast(t){ const e=$("#toast"); e.textContent=t; e.hidden=false; clearTimeout(toast.t); toast.t=setTimeout(()=>e.hidden=true,2800); }
+const ic=(p,cls="i")=>`<svg class="${cls}" viewBox="0 0 24 24">${p}</svg>`;
+const P={
+  fire:'<path d="M12 22c4 0 7-3 7-7 0-5-5-7-4-12-3 2-5 5-5 8-1-1-2-2-2-4-2 2-3 5-3 8 0 4 3 7 7 7z"/>',
+  amb:'<rect x="2" y="7" width="15" height="11" rx="2"/><path d="M17 11h3l2 3v4h-5"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/><path d="M9.5 10v5M7 12.5h5"/>',
+  car:'<path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="2"/><circle cx="16" cy="17" r="2"/>',
+  tree:'<path d="M12 22v-6"/><path d="M12 2l6 9h-3l4 5H5l4-5H6z"/>',
+  alert:'<path d="M12 3L2 20h20z"/><path d="M12 10v4"/><path d="M12 17h0"/>',
+  quake:'<path d="M2 12h4l2-5 3 10 3-8 2 3h6"/>',
+  water:'<path d="M12 3s7 7 7 12a7 7 0 0 1-14 0c0-5 7-12 7-12z"/>',
+  shield:'<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/>',
+  bolt:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+  wind:'<path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h16a3 3 0 1 1-3 3"/><path d="M3 16h8"/>',
+  chev:'<path d="M9 6l6 6-6 6"/>', back:'<path d="M15 6l-6 6 6 6"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+  book:'<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/>',
+  bag:'<path d="M6 8h12l1 12H5z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  bunker:'<path d="M3 20h18"/><path d="M5 20v-7a7 7 0 0 1 14 0v7"/><path d="M10 20v-4h4v4"/>',
+  pin:'<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+  moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>', therm:'<path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z"/>',
+  star:'<path d="M12 3l2.7 5.6 6.3.9-4.5 4.4 1 6.1L12 17l-5.5 3 1-6.1L3 9.5l6.3-.9z"/>', share:'<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>',
+  nav:'<path d="M3 11l18-8-8 18-2-8z"/>', dl:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>', trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h0"/>', mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
+  hosp:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>', police:'<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M12 8l1.2 2.4 2.6.4-1.9 1.8.5 2.6L12 14l-2.4 1.2.5-2.6-1.9-1.8 2.6-.4z"/>',
+  people:'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0M14 20a4.5 4.5 0 0 1 8 0"/>', plug:'<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', check:'<path d="M5 12l5 5 9-10"/>', up:'<path d="M6 15l6-6 6 6"/>', down:'<path d="M6 9l6 6 6-6"/>'
+};
 
-/* Pedido com timeout, proxy opcional e cópia guardada para usar sem rede */
-async function getJSON(url, { key, ttl=0, opts={} } = {}){
-  const cacheKey = key ? "c:"+key : null;
-  if(cacheKey && ttl){ const c = LS.get(cacheKey); if(c && Date.now()-c.t < ttl) return { data:c.d, t:c.t, cached:true }; }
-  const ctrl = new AbortController(); const tm = setTimeout(()=>ctrl.abort(), 20000);
-  const full = cfg.proxy ? cfg.proxy + encodeURIComponent(url) : url;
+/* Pedido com timeout, proxy opcional e cópia local */
+async function getJSON(url,{key,ttl=0,opts={}}={}){
+  const ck=key?"c:"+key:null;
+  if(ck&&ttl){ const c=LS.get(ck); if(c&&Date.now()-c.t<ttl) return {data:c.d,t:c.t,cached:true}; }
+  const ctrl=new AbortController(); const tm=setTimeout(()=>ctrl.abort(),20000);
   try{
-    const r = await fetch(full, Object.assign({ signal:ctrl.signal, cache:"no-store" }, opts));
+    const r=await fetch(cfg.proxy?cfg.proxy+encodeURIComponent(url):url,Object.assign({signal:ctrl.signal,cache:"no-store"},opts));
     if(!r.ok) throw new Error("HTTP "+r.status);
-    const d = await r.json();
-    if(cacheKey) LS.set(cacheKey, { t:Date.now(), d });
-    return { data:d, t:Date.now(), cached:false };
-  }catch(e){
-    if(cacheKey){ const c = LS.get(cacheKey); if(c) return { data:c.d, t:c.t, cached:true, stale:true, error:e }; }
-    throw e;
-  }finally{ clearTimeout(tm); }
+    const d=await r.json(); if(ck) LS.set(ck,{t:Date.now(),d}); return {data:d,t:Date.now()};
+  }catch(e){ if(ck){ const c=LS.get(ck); if(c) return {data:c.d,t:c.t,stale:true}; } throw e; }
+  finally{ clearTimeout(tm); }
 }
 
-/* ============ Estado ============ */
-const S = { warnings:[], quakes:[], fires:[], rcm:{}, wx:null, aq:null, scope:"mine", lvlFilter:new Set(["yellow","orange","red"]) };
+/* Local selecionado (a minha localização ou cidade seguida) */
+function here(){ if(cfg.sel==="me") return cfg.me; return cfg.cities.find(c=>c.id===cfg.sel)||cfg.me; }
+function nearestArea(lat,lon){ let b=null,bd=1e9; for(const[k,v] of Object.entries(AREAS)){ const d=km(lat,lon,v[1],v[2]); if(d<bd){bd=d;b=k;} } return b; }
+const areaName=a=>AREAS[a]?AREAS[a][0]:a;
 
-/* ============ Fontes ============ */
-const IPMA = "https://api.ipma.pt/open-data";
+const S={ warnings:[], act:[], actSrc:"", quakes:[], rcm:{}, wx:null, aq:null, outages:null, shelters:[], meta:{}, fails:[] };
+const IPMA="https://api.ipma.pt/open-data";
 
+/* ======================================================================
+   FONTES
+   ====================================================================== */
 async function loadWarnings(){
-  const r = await getJSON(IPMA+"/forecast/warnings/warnings_www.json", { key:"warn" });
-  const now = Date.now();
-  S.warnings = (Array.isArray(r.data) ? r.data : [])
-    .filter(w => w && w.awarenessLevelID && w.awarenessLevelID !== "green")
-    .map(w => ({ area:w.idAreaAviso, type:TYPEPT[w.awarenessTypeName] || w.awarenessTypeName || "Aviso", lvl:w.awarenessLevelID,
-      start:new Date(w.startTime), end:new Date(w.endTime), text:(w.text||"").trim() }))
-    .filter(w => isNaN(w.end) || w.end.getTime() > now)
-    .sort((a,b) => (LVL[b.lvl]-LVL[a.lvl]) || (a.start-b.start));
-  S.warnMeta = r;
-  logHistory();
+  const r=await getJSON(IPMA+"/forecast/warnings/warnings_www.json",{key:"warn"}); S.meta.warn=r; const now=Date.now();
+  S.warnings=(Array.isArray(r.data)?r.data:[]).filter(w=>w&&w.awarenessLevelID&&w.awarenessLevelID!=="green")
+    .map(w=>({id:[w.idAreaAviso,w.awarenessTypeName,w.awarenessLevelID,w.startTime].join("|"),area:w.idAreaAviso,type:TYPEPT[w.awarenessTypeName]||w.awarenessTypeName||"Aviso",
+      lvl:w.awarenessLevelID,start:new Date(w.startTime),end:new Date(w.endTime),text:(w.text||"").trim()}))
+    .filter(w=>isNaN(w.end)||w.end.getTime()>now).sort((a,b)=>(LVL[b.lvl]-LVL[a.lvl])||(a.start-b.start));
+  const h=LS.get("hist",[]),ks=new Set(h.map(x=>x.id));
+  S.warnings.forEach(w=>{ if(!ks.has(w.id)) h.unshift({id:w.id,area:w.area,type:w.type,lvl:w.lvl,start:w.start.toISOString(),end:w.end.toISOString(),text:w.text}); });
+  LS.set("hist",h.filter(x=>new Date(x.end)>Date.now()-30*864e5).slice(0,400));
 }
+
+/* --- Ocorrências: Proteção Civil (ArcGIS do portal prociv.gov.pt) com fogos.pt como alternativa --- */
+const PROCIV_PORTAL="https://prociv-portal.geomai.mai.gov.pt/arcgis";
+const PROCIV_APP="29e83f11f7a34339b35364e483e3846f";
+async function procivLayers(){
+  const cached=LS.get("procivLayers"); if(cached&&Date.now()-cached.t<7*864e5&&cached.urls.length) return cached.urls;
+  const urls=new Set(), items=new Set();
+  const scan=o=>{ const s=JSON.stringify(o); (s.match(/https?:\\?\/\\?\/[^"\\]+?\/(?:FeatureServer|MapServer)\/\d+/g)||[]).forEach(u=>urls.add(u.replace(/\\\//g,"/")));
+    (s.match(/"itemId"\s*:\s*"([0-9a-f]{32})"/g)||[]).forEach(m=>items.add(m.match(/[0-9a-f]{32}/)[0])); };
+  const app=await getJSON(`${PROCIV_PORTAL}/sharing/rest/content/items/${PROCIV_APP}/data?f=json`); scan(app.data);
+  for(const id of [...items].slice(0,8)){
+    try{ const info=await getJSON(`${PROCIV_PORTAL}/sharing/rest/content/items/${id}?f=json`);
+      if(info.data&&info.data.url&&/FeatureServer|MapServer/.test(info.data.url)){ const u=info.data.url.replace(/\/$/,""); /\/\d+$/.test(u)?urls.add(u):urls.add(u+"/0"); }
+      const d=await getJSON(`${PROCIV_PORTAL}/sharing/rest/content/items/${id}/data?f=json`); scan(d.data);
+      (d.data&&d.data.operationalLayers||[]).forEach(l=>{ if(l.url){ const u=l.url.replace(/\/$/,""); urls.add(/\/\d+$/.test(u)?u:u+"/0"); } });
+    }catch(e){}
+  }
+  const list=[...urls]; if(list.length) LS.set("procivLayers",{t:Date.now(),urls:list}); return list;
+}
+function pick(o,re){ for(const k in o){ if(re.test(k)&&o[k]!=null&&o[k]!=="") return o[k]; } return null; }
+function toDate(v){ if(v==null) return null; if(typeof v==="number") return new Date(v>1e11?v:v*1000); const s=String(v); const m=s.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})[ T]?(\d{2}:\d{2})?/); if(m) return new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]||"00:00"}:00`); const d=new Date(s); return isNaN(d)?null:d; }
+async function loadProciv(){
+  const layers=await procivLayers(); if(!layers.length) throw new Error("sem camadas");
+  const out=[];
+  for(const u of layers.slice(0,6)){
+    try{
+      const r=await getJSON(`${u}/query?where=1%3D1&outFields=*&outSR=4326&returnGeometry=true&resultRecordCount=2000&f=json`);
+      for(const f of (r.data.features||[])){
+        const g=f.geometry||{}, a=f.attributes||{}; const lat=+(g.y??pick(a,/^lat/i)), lon=+(g.x??pick(a,/^lon|^lng/i)); if(!isFinite(lat)||!isFinite(lon)||!lat) continue;
+        out.push({ id:"pc"+(pick(a,/^(objectid|fid|id|numero|n_?ocorr)/i)??(lat+","+lon)), lat, lon,
+          nat:String(pick(a,/natureza|descri|tipo/i)||"Ocorrência"), status:String(pick(a,/estado|status|fase|situa/i)||""),
+          loc:[pick(a,/localidade|^local$|lugar/i),pick(a,/freguesia/i),pick(a,/concelho|municip/i)].filter(Boolean).join(", "),
+          district:String(pick(a,/distrito/i)||""), man:+pick(a,/operac|humanos|^man$|operacionais/i)||0, terrain:+pick(a,/terrest|veic/i)||0, aerial:+pick(a,/aere|aére/i)||0,
+          time:toDate(pick(a,/data|hora|inicio|date|dt/i)), important:/import|signific|relev/i.test(JSON.stringify(a)) && /sim|true|1/i.test(String(pick(a,/import|signific|relev/i))) });
+      }
+    }catch(e){}
+  }
+  if(!out.length) throw new Error("sem ocorrências");
+  return out;
+}
+async function loadFogos(){
+  const r=await getJSON("https://api.fogos.pt/v2/incidents/active",{key:"fogos"}); const arr=(r.data&&(r.data.data||r.data))||[];
+  return (Array.isArray(arr)?arr:[]).map(f=>{ let t=f.dateTime&&f.dateTime.sec?new Date(f.dateTime.sec*1000):null; if(!t&&f.date&&f.hour){ const[d,m,y]=String(f.date).split("-"); t=new Date(`${y}-${m}-${d}T${f.hour}:00`); }
+    return {id:"fg"+f.id,lat:+f.lat,lon:+(f.lng??f.lon),nat:f.natureza||"Ocorrência",status:f.status||"",loc:[f.localidade,f.freguesia,f.concelho].filter(Boolean).join(", ")||f.location||"",
+      district:f.district||"",man:+f.man||0,terrain:+f.terrain||0,aerial:+f.aerial||0,time:t,important:!!f.important}; }).filter(f=>isFinite(f.lat)&&isFinite(f.lon)&&f.lat);
+}
+async function loadActivity(){
+  try{ S.act=await loadProciv(); S.actSrc="Proteção Civil (ANEPC)"; LS.set("c:act",{t:Date.now(),d:S.act,src:S.actSrc}); }
+  catch(e){ try{ S.act=await loadFogos(); S.actSrc="ANEPC via fogos.pt"; }
+    catch(e2){ const c=LS.get("c:act"); if(c){ S.act=c.d.map(x=>({...x,time:x.time?new Date(x.time):null})); S.actSrc=c.src+" (guardado)"; } else throw e2; } }
+  S.act.forEach(a=>a.kind=kindOf(a.nat));
+}
+function kindOf(n){ n=(n||"").toLowerCase();
+  if(/inc[eê]nd|fogo|mato|povoamento|agr[ií]col|florest|queima|habitac|industr/.test(n)) return "fire";
+  if(/acidente|rodovi|colis|despiste|atropel|ferrovi/.test(n)) return "car";
+  if(/[aá]rvore|queda|derrocada|movimento de massa|estrutura/.test(n)) return "tree";
+  if(/inunda|cheia|alagamento|[aá]gua/.test(n)) return "water";
+  if(/sa[uú]de|doen|assist[eê]ncia|pr[eé]-hospital|emerg[eê]ncia m[eé]d/.test(n)) return "amb";
+  return "alert"; }
+const KIND={fire:["#ff7043","#3b1d14",P.fire,"Incêndio"],car:["#4fc3f7","#13303b",P.car,"Acidente"],tree:["#aed581","#26331a",P.tree,"Queda / estrutura"],water:["#4fc3f7","#13303b",P.water,"Inundação"],amb:["#ef5350","#3b1515",P.amb,"Saúde"],alert:["#ffd54f","#3b3410",P.alert,"Outra"]};
 
 async function loadQuakes(){
-  const areas = [7,3]; const out = [];
-  for(const a of areas){
-    try{
-      const r = await getJSON(IPMA+"/observation/seismic/"+a+".json", { key:"sis"+a });
-      for(const q of (r.data && r.data.data) || []){
-        const lat=parseFloat(q.lat), lon=parseFloat(q.lon), mag=parseFloat(q.magnitud);
-        if(isNaN(lat)||isNaN(lon)) continue;
-        out.push({ id:q.sismoId || (q.time+lat+lon), lat, lon, mag, depth:q.depth, region:q.obsRegion || q.local || "—",
-          time:new Date(q.time), felt:q.degree || q.sensed || null });
-      }
-    }catch(e){ if(a===7) throw e; }
-  }
-  S.quakes = out.sort((a,b)=>b.time-a.time);
+  const out=[];
+  for(const a of [7,3]){ try{ const r=await getJSON(IPMA+"/observation/seismic/"+a+".json",{key:"sis"+a});
+    for(const q of (r.data&&r.data.data)||[]){ const lat=parseFloat(q.lat),lon=parseFloat(q.lon); if(isNaN(lat)) continue;
+      out.push({id:q.sismoId||(q.time+lat),lat,lon,mag:parseFloat(q.magnitud),depth:q.depth,region:q.obsRegion||q.local||"—",time:new Date(q.time),felt:q.degree||q.sensed||null}); } }catch(e){ if(a===7) throw e; } }
+  S.quakes=out.sort((a,b)=>b.time-a.time);
+}
+async function loadRcm(){ for(const d of [0,1]) S.rcm[d]=(await getJSON(IPMA+"/forecast/meteorology/rcm/rcm-d"+d+".json",{key:"rcm"+d,ttl:3*3600e3})).data; }
+async function loadWx(){ const h=here();
+  S.wx=(await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${h.lat}&longitude=${h.lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max&timezone=Europe%2FLisbon&forecast_days=7`,{key:"wx"})).data; }
+async function loadAq(){ const h=here(); S.aq=(await getJSON(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${h.lat}&longitude=${h.lon}&current=european_aqi,pm2_5,pm10&timezone=Europe%2FLisbon`,{key:"aq"})).data; }
+
+/* Falhas de energia — dados abertos E-REDES (Opendatasoft). Campos lidos de forma flexível. */
+async function loadOutages(){
+  const r=await getJSON("https://e-redes.opendatasoft.com/api/explore/v2.1/catalog/datasets/outages-per-geography/records?limit=100",{key:"out"});
+  const rows=r.data.results||[];
+  const items=rows.map(x=>({ where:String(pick(x,/concelho|municip/i)||pick(x,/zip|postal|cp|codigo/i)||pick(x,/distrito/i)||"—"),
+    district:String(pick(x,/distrito/i)||""), n:+(pick(x,/count|n_|num|total|outage|interrup|avaria/i))||1,
+    raw:x }));
+  S.outages={ items, t:r.t, stale:r.stale };
 }
 
-async function loadFires(){
-  const r = await getJSON("https://api.fogos.pt/v2/incidents/active", { key:"fogos" });
-  const arr = (r.data && (r.data.data || r.data)) || [];
-  S.fires = (Array.isArray(arr) ? arr : []).map(f => {
-    const lat=parseFloat(f.lat), lon=parseFloat(f.lng ?? f.lon);
-    let t = f.dateTime && f.dateTime.sec ? new Date(f.dateTime.sec*1000) : null;
-    if(!t && f.date && f.hour){ const [d,m,y]=String(f.date).split("-"); t=new Date(`${y}-${m}-${d}T${f.hour}:00`); }
-    return { id:f.id, lat, lon, nat:f.natureza || "Ocorrência", status:f.status || "", statusColor:f.statusColor ? "#"+String(f.statusColor).replace("#","") : null,
-      loc:[f.localidade, f.freguesia, f.concelho].filter(Boolean).join(", ") || f.location || "—", district:f.district || "",
-      man:+f.man||0, terrain:+f.terrain||0, aerial:+f.aerial||0, time:t,
-      isFire: typeof f.isFire==="boolean" ? f.isFire : /incênd|incend|fogo|mato|povoamento|agrícola|florest/i.test(f.natureza||"") };
-  }).filter(f => !isNaN(f.lat) && !isNaN(f.lon));
-  S.firesMeta = r;
+/* Abrigos e pontos seguros — OpenStreetMap (Overpass) */
+const SHCAT={ shelter:["Abrigo","#ffeb3b",P.bunker], bunker:["Bunker","#ffeb3b",P.bunker], assembly:["Ponto de encontro","#81c784",P.people], hospital:["Hospital","#ef5350",P.hosp], fire:["Bombeiros","#ff7043",P.fire], police:["Polícia / GNR","#4fc3f7",P.police] };
+function shCat(t){ if(t.emergency==="assembly_point") return "assembly"; if(t.military==="bunker"||t.building==="bunker") return "bunker"; if(t.amenity==="hospital") return "hospital"; if(t.amenity==="fire_station") return "fire"; if(t.amenity==="police") return "police"; if(t.amenity==="shelter") return "shelter"; return null; }
+async function loadShelters(lat,lon,rKm){
+  const r=Math.round(rKm*1000);
+  const q=`[out:json][timeout:30];(nwr["amenity"="shelter"]["shelter_type"!="public_transport"]["shelter_type"!="picnic_shelter"](around:${r},${lat},${lon});nwr["military"="bunker"](around:${r},${lat},${lon});nwr["building"="bunker"](around:${r},${lat},${lon});nwr["emergency"="assembly_point"](around:${r},${lat},${lon});nwr["amenity"="hospital"](around:${r},${lat},${lon});nwr["amenity"="fire_station"](around:${r},${lat},${lon});nwr["amenity"="police"](around:${r},${lat},${lon}););out center 1500;`;
+  const res=await getJSON("https://overpass-api.de/api/interpreter",{opts:{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}}});
+  return (res.data.elements||[]).map(e=>{ const t=e.tags||{}; const c=shCat(t); const la=e.lat??e.center?.lat, lo=e.lon??e.center?.lon; if(!c||la==null) return null;
+    return { id:e.type[0]+e.id, cat:c, lat:la, lon:lo, name:t.name||SHCAT[c][0], phone:t.phone||t["contact:phone"]||"", addr:[t["addr:street"],t["addr:housenumber"],t["addr:city"]].filter(Boolean).join(" ") }; }).filter(Boolean);
 }
 
-async function loadRcm(){
-  for(const d of [0,1]){
-    const r = await getJSON(IPMA+"/forecast/meteorology/rcm/rcm-d"+d+".json", { key:"rcm"+d, ttl:3*3600e3 });
-    S.rcm[d] = r.data;
-  }
+/* ======================================================================
+   PAINEL
+   ====================================================================== */
+function renderPlaces(){
+  const box=$("#places"); const all=[{id:"me",name:"A minha localização"},...cfg.cities];
+  box.innerHTML=all.map(c=>`<button class="chip" data-id="${esc(c.id)}" aria-pressed="${cfg.sel===c.id}">${c.id==="me"?ic(P.nav,"i s"):""}${esc(c.id==="me"&&cfg.me.name?cfg.me.name:c.name)}</button>`).join("")+
+    `<button class="chip add" id="addCity">${ic(P.plus,"i s")}Seguir uma cidade</button>`;
+  box.querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>{ cfg.sel=b.dataset.id; save(); renderPlaces(); refresh(); });
+  $("#addCity").onclick=()=>openCityPicker();
 }
 
-async function loadWx(){
-  const u = `https://api.open-meteo.com/v1/forecast?latitude=${cfg.lat}&longitude=${cfg.lon}&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&daily=temperature_2m_max,temperature_2m_min,uv_index_max,precipitation_sum&timezone=Europe%2FLisbon&forecast_days=1`;
-  S.wx = (await getJSON(u, { key:"wx" })).data;
+const WR={
+  alertas(){ const h=here(), a=nearestArea(h.lat,h.lon); const ws=S.warnings.filter(w=>w.area===a); const now=Date.now();
+    const hist=LS.get("hist",[]).filter(x=>x.area===a&&new Date(x.end)<now);
+    let b=`<div class="wh"><h2>Alertas perto de ${esc(h.id==="me"||!h.id?"si":h.name)}</h2>${hist.length?`<button class="lnk" data-hist>Histórico</button>`:""}</div>`;
+    if(S.meta.warn&&S.meta.warn.stale) b+=`<div class="small muted">A mostrar alertas guardados. Ligue-se para atualizar.</div>`;
+    if(!S.meta.warn) b+=`<div class="empty">A carregar alertas…</div>`;
+    else if(!ws.length) b+=`<div class="clear"><div class="ok">${ic(P.check)}</div><div><b>Sem alertas ativos na sua zona</b><span class="small muted">Está tudo calmo por agora · ${esc(areaName(a))}</span></div></div>`;
+    else b+=ws.map(w=>`<button class="alert" data-w="${esc(w.id)}" style="--lc:${LVC[w.lvl]}"><span class="lv"></span><span style="min-width:0;flex:1"><span class="at">${esc(w.type)}</span> <span class="tag" style="background:${LVC[w.lvl]};color:#1a1a1a">${LVN[w.lvl]}</span>${w.start<=now?` <span class="tag live">Em vigor</span>`:""}<span class="as" style="display:block">${esc(areaName(w.area))} · ${LVSEV[w.lvl]}</span><span class="ap" style="display:block">${fDT(w.start)} → ${fDT(w.end)}</span></span></button>`).join("");
+    if(hist.length) b+=`<div class="small muted">${hist.length} arquivado${hist.length>1?"s":""} nos últimos 30 dias</div>`;
+    b+=`<div class="small muted">Fonte: IPMA</div>`; return b; },
+  atividade(){ const h=here(); const R=cfg.radius; const list=S.act.map(x=>({...x,d:km(h.lat,h.lon,x.lat,x.lon)})).filter(x=>x.d<=R).sort((a,b)=>a.d-b.d);
+    let b=`<div class="wh"><h2>Atividade de emergência</h2><button class="lnk" data-map="atividade">Ver mapa</button></div>`;
+    if(!S.act.length&&!S.actSrc) return b+`<div class="empty">A carregar ocorrências…</div>`;
+    b+=`<div class="small muted">${list.length} num raio de ${R} km · ${S.act.length} ativas no país${S.lastAct?` · Última atividade ${ago(S.lastAct)}`:""}</div>`;
+    b+=list.slice(0,5).map(actRow).join("")||`<div class="empty">Sem ocorrências ativas perto de si.</div>`;
+    if(list.length>5) b+=`<button class="btn o full" data-map="atividade">Mais ${list.length-5} no mapa</button>`;
+    return b+`<div class="small muted">Fonte: ${esc(S.actSrc)}</div>`; },
+  ultimahora(){ if(!cfg.breakingDash) return null; const st=stories();
+    let b=`<div class="wh"><h2>Última hora</h2>${st.length?`<button class="lnk" data-allst>Ver tudo</button>`:""}</div>`;
+    b+= st.length?`<div class="stories">`+st.slice(0,8).map((s,i)=>`<button class="story" data-st="${i}" style="--st1:${s.c1};--st2:${s.c2}"><span>${s.tags}</span><span class="st-t">${esc(s.t)}</span><span class="st-s">${esc(s.s)} · ${ago(s.time)}</span></button>`).join("")+`</div>`:`<div class="empty">Nada de última hora neste momento.</div>`;
+    return b; },
+  minimapa(){ const h=here(); const nA=S.act.filter(x=>km(h.lat,h.lon,x.lat,x.lon)<=cfg.radius).length; const nW=S.warnings.filter(w=>w.area===nearestArea(h.lat,h.lon)).length;
+    return `<div class="wh"><h2>Mapa da zona</h2><button class="lnk" data-map="tudo">Abrir mapa</button></div><div class="mini" data-map="tudo"><div class="mm" id="mini"></div><div class="cnts"><span>${nW} alertas</span><span>${nA} atividade</span><span>${S.shelters.length||"—"} abrigos</span></div></div>`; },
+  tempo(){ const w=S.wx; let b=`<div class="wh"><h2>Tempo</h2><span class="small muted">Open-Meteo</span></div>`; if(!w||!w.current) return b+`<div class="empty">A carregar…</div>`;
+    const c=w.current,d=w.daily;
+    b+=`<div class="wx"><span class="tmp">${T(c.temperature_2m)}</span><div><b>${esc(WMO[c.weather_code]||"")}</b><div class="small muted">Sensação ${T(c.apparent_temperature)} · Vento ${num(c.wind_speed_10m)} km/h, rajada ${num(c.wind_gusts_10m)}</div></div></div>`;
+    b+=`<div class="fc">`+d.time.map((t,i)=>`<div><span class="muted">${i?WDF.format(new Date(t)).replace(".",""):"Hoje"}</span>${wxIcon(d.weather_code[i])}<b>${T(d.temperature_2m_max[i])}</b><span class="muted">${T(d.temperature_2m_min[i])}</span><span style="color:var(--blue)">${d.precipitation_probability_max?num(d.precipitation_probability_max[i])+"%":""}</span></div>`).join("")+`</div>`;
+    return b; },
+  ambiente(){ const h=here(); const aq=S.aq&&S.aq.current; const t=rcmAt(h,0), m=rcmAt(h,1); const uv=S.wx&&S.wx.daily&&S.wx.daily.uv_index_max?S.wx.daily.uv_index_max[0]:null; const [ab,ac]=aqBand(aq&&aq.european_aqi);
+    return `<div class="wh"><h2>Ambiente</h2></div><div class="env">
+      <div><span class="k">Qualidade do ar</span><span class="v">${num(aq&&aq.european_aqi)}</span><span class="q" style="--qc:${ac}">${ab}</span></div>
+      <div><span class="k">Risco incêndio hoje</span><span class="v" style="color:${t?RCMC[t.v]:"inherit"}">${t?t.v+"/5":"—"}</span><span class="q" style="--qc:var(--fg2)">${t?RCMN[t.v]:""}${m?` · amanhã ${m.v}/5`:""}</span></div>
+      <div><span class="k">Índice UV máx.</span><span class="v">${num(uv,0)}</span><span class="q" style="--qc:${uv>=8?"#ff5449":uv>=6?"#ff9800":uv>=3?"#ffd54f":"#4caf50"}">${uv==null?"":uv>=8?"Muito elevado":uv>=6?"Elevado":uv>=3?"Moderado":"Baixo"}</span></div></div>
+      <div class="small muted">Fontes: CAMS/Open-Meteo, IPMA</div>`; },
+  falhas(){ const o=S.outages; const h=here();
+    let b=`<div class="wh"><h2>Falhas de serviços</h2></div>`;
+    b+=`<div class="small" style="font-weight:600">Energia — E-REDES</div>`;
+    if(!o) b+=`<div class="empty">${S.fails.includes("energia")?`<span class="err">Sem dados da E-REDES agora.</span>`:"A carregar…"}</div>`;
+    else { const tot=o.items.reduce((s,x)=>s+x.n,0); const top=o.items.slice().sort((a,b)=>b.n-a.n).slice(0,4);
+      b+= tot?`<div class="small muted">${tot} interrupção(ões) ativa(s) registada(s)${o.stale?" (guardado)":""}</div>`+top.map(x=>`<div class="act" style="cursor:default">${`<span class="ai" style="--ac:#ffb74d;--ac-bg:#3b2a12">${ic(P.bolt)}</span>`}<span class="am"><span class="t">${esc(x.where)}</span><span class="s">${esc(x.district)}</span></span><span class="ar">${x.n}</span></div>`).join("")
+        :`<div class="clear"><div class="ok">${ic(P.check)}</div><div><b>Sem falhas de energia registadas</b></div></div>`; }
+    b+=`<a class="small" href="https://www.e-redes.pt/pt-pt/avarias-e-emergencias" target="_blank" rel="noopener">Comunicar avaria ou consultar a sua morada na E-REDES</a>`;
+    b+=`<div class="small" style="font-weight:600;margin-top:4px">Outros serviços — Downdetector</div><div class="svc">`+
+      DD.map(([n,s,c,l])=>`<a href="https://downdetector.pt/problemas/${s}/" target="_blank" rel="noopener"><i style="--sc:${c}">${l}</i>${n}</a>`).join("")+`</div>
+      <div class="small muted">Abre o Downdetector com as queixas dos utilizadores em tempo real. O Downdetector não tem uma API gratuita, por isso estes dados não aparecem dentro da app. <a href="https://downdetector.pt/" target="_blank" rel="noopener">Ver todos</a></div>`;
+    return b; },
+  sismos(){ const h=here(); const R=Math.max(cfg.radius,100); const wk=Date.now()-7*864e5; const l=S.quakes.map(q=>({...q,d:km(h.lat,h.lon,q.lat,q.lon)}));
+    const near=l.filter(q=>q.d<=R&&q.time>=wk), felt=l.filter(q=>q.felt&&q.time>=wk); const show=(near.length?near:felt).slice(0,4);
+    let b=`<div class="wh"><h2>Sismos</h2><button class="lnk" data-map="sismos">Ver mapa</button></div><div class="small muted">${near.length} nos últimos 7 dias num raio de ${R} km · ${l.length} em 30 dias</div>`;
+    b+=show.map(q=>`<button class="act" data-q="${esc(q.id)}"><span class="ai" style="--ac:#b388ff;--ac-bg:#2a1f3d"><b class="mono" style="font-size:13px">${num(q.mag,1)}</b></span><span class="am"><span class="t">${esc(q.region)}${q.felt?` <span class="tag g">Sentido</span>`:""}</span><span class="m">${fDT(q.time)} · ${num(q.depth)} km prof.</span></span><span class="ar">${fKm(q.d)}</span></button>`).join("");
+    return b+`<div class="small muted">Fonte: IPMA</div>`; }
+};
+const DD=[["MEO","meo","#00a3e0","M"],["NOS","nos","#1a1a1a","N"],["Vodafone","vodafone","#e60000","V"],["Facebook","facebook","#1877f2","F"],["WhatsApp","whatsapp","#25d366","W"],["Instagram","instagram","#c13584","I"],["Google","google","#4285f4","G"],["YouTube","youtube","#ff0000","Y"]];
+function actRow(x){ const k=KIND[x.kind]||KIND.alert; const urgent=x.important||x.man>=60||x.aerial>=2;
+  return `<button class="act" data-a="${esc(x.id)}"><span class="ai" style="--ac:${k[0]};--ac-bg:${k[1]}">${ic(k[2])}</span><span class="am"><span class="t">${esc(x.nat)}${urgent?` <span class="tag urg">Urgente</span>`:""}</span><span class="s">${esc(x.loc||x.district)}${x.status?" · "+esc(x.status):""}</span><span class="m">${x.man} operac. · ${x.terrain} terrestres · ${x.aerial} aéreos</span></span><span class="ar">${x.d!=null?fKm(x.d)+"<br>":""}${x.time?ago(x.time):""}</span></button>`; }
+
+const WMO={0:"Céu limpo",1:"Pouco nublado",2:"Parcialmente nublado",3:"Nublado",45:"Nevoeiro",48:"Nevoeiro",51:"Chuvisco fraco",53:"Chuvisco",55:"Chuvisco forte",61:"Chuva fraca",63:"Chuva",65:"Chuva forte",66:"Chuva gelada",67:"Chuva gelada",71:"Neve fraca",73:"Neve",75:"Neve forte",77:"Neve",80:"Aguaceiros fracos",81:"Aguaceiros",82:"Aguaceiros fortes",85:"Aguaceiros de neve",86:"Aguaceiros de neve",95:"Trovoada",96:"Trovoada com granizo",99:"Trovoada com granizo"};
+function wxIcon(c){ const sun='<circle cx="12" cy="12" r="4" stroke="#ffd54f"/><path stroke="#ffd54f" d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M5 19l1.4-1.4M17.6 6.4L19 5"/>';
+  const cloud='<path stroke="#cac4d0" d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 18z"/>';
+  const rain='<path stroke="#cac4d0" d="M7 14h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 14z"/><path stroke="#4fc3f7" d="M8 17l-1 3M12 17l-1 3M16 17l-1 3"/>';
+  const storm='<path stroke="#cac4d0" d="M7 14h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 14z"/><path stroke="#ffd54f" d="M12 15l-2 4h3l-2 4"/>';
+  const p=c==0||c==1?sun:c<=3||c==45||c==48?cloud:c>=95?storm:rain; return `<svg class="i" viewBox="0 0 24 24" style="width:22px;height:22px">${p}</svg>`; }
+function aqBand(v){ if(v==null) return ["—","#938f99"]; if(v<=20) return ["Boa","#4caf50"]; if(v<=40) return ["Razoável","#8bc34a"]; if(v<=60) return ["Moderada","#ffd54f"]; if(v<=80) return ["Fraca","#ff9800"]; if(v<=100) return ["Muito fraca","#ff5449"]; return ["Extremamente fraca","#d500f9"]; }
+const RCMN={1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito elevado",5:"Máximo"}; const RCMC={1:"#4caf50",2:"#ffd54f",3:"#ff9800",4:"#ff5449",5:"#d32f2f"};
+function rcmAt(h,d){ const r=S.rcm[d]; if(!r||!r.local) return null; let b=null,bd=1e9; for(const[dico,l] of Object.entries(r.local)){ const la=+l.latitude,lo=+l.longitude; if(!isFinite(la)) continue; const dd=km(h.lat,h.lon,la,lo); if(dd<bd){bd=dd;b={dico,v:l.data&&l.data.rcm};} } return b; }
+
+/* Última hora: alertas laranja/vermelhos, ocorrências importantes e sismos sentidos */
+function stories(){ const out=[]; const now=Date.now();
+  S.warnings.filter(w=>LVL[w.lvl]>=2).forEach(w=>out.push({k:"w",ref:w.id,time:w.start>now?new Date():w.start,t:`Aviso ${LVN[w.lvl].toLowerCase()}: ${w.type.toLowerCase()} em ${areaName(w.area)}`,s:"IPMA",tags:`<span class="tag off">Oficial</span>`,c1:w.lvl==="red"?"#7f1d1d":"#7a3e00",c2:"#1e1e1e"}));
+  S.act.filter(a=>a.important||a.man>=60||a.aerial>=2).forEach(a=>out.push({k:"a",ref:a.id,time:a.time||new Date(),t:`${a.nat}${a.loc?" em "+a.loc.split(",").pop().trim():""}`,s:`${a.man} operacionais${a.aerial?` · ${a.aerial} meios aéreos`:""}`,tags:`<span class="tag live">Ao vivo</span>`,c1:"#5a1f0e",c2:"#1e1e1e"}));
+  S.quakes.filter(q=>(q.felt||q.mag>=3.5)&&now-q.time<48*3600e3).forEach(q=>out.push({k:"q",ref:q.id,time:q.time,t:`Sismo de magnitude ${num(q.mag,1)} — ${q.region}`,s:q.felt?"Sentido pela população":"IPMA",tags:`<span class="tag off">Oficial</span>`,c1:"#3b1f6b",c2:"#1e1e1e"}));
+  return out.sort((a,b)=>b.time-a.time); }
+
+let miniMap=null;
+function renderWidgets(){
+  const box=$("#widgets"); box.innerHTML="";
+  cfg.layout.filter(x=>x.on).forEach(({id})=>{ const f=WR[id]; if(!f) return; const html=f(); if(html==null) return; const d=document.createElement("div"); d.className="w"; d.id="w-"+id; d.innerHTML=html; box.appendChild(d); });
+  box.querySelectorAll("[data-map]").forEach(e=>e.onclick=ev=>{ ev.stopPropagation(); go("mapa"); setMode(e.dataset.map); });
+  box.querySelectorAll("[data-a]").forEach(e=>e.onclick=()=>sheetAct(S.act.find(x=>x.id===e.dataset.a)));
+  box.querySelectorAll("[data-w]").forEach(e=>e.onclick=()=>sheetWarn(S.warnings.find(x=>x.id===e.dataset.w)));
+  box.querySelectorAll("[data-q]").forEach(e=>e.onclick=()=>sheetQuake(S.quakes.find(x=>String(x.id)===e.dataset.q)));
+  box.querySelectorAll("[data-st]").forEach(e=>e.onclick=()=>openStory(stories()[+e.dataset.st]));
+  box.querySelectorAll("[data-allst]").forEach(e=>e.onclick=()=>sheetStories());
+  box.querySelectorAll("[data-hist]").forEach(e=>e.onclick=()=>sheetHistory());
+  if($("#mini")) drawMini();
+  const n=!("Notification" in window)||Notification.permission!=="default"||cfg.nbDismissed; $("#notifBanner").hidden=n;
 }
-async function loadAq(){
-  const u = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${cfg.lat}&longitude=${cfg.lon}&current=european_aqi,pm2_5,pm10,ozone,nitrogen_dioxide&timezone=Europe%2FLisbon`;
-  S.aq = (await getJSON(u, { key:"aq" })).data;
+function drawMini(){
+  if(miniMap){ miniMap.remove(); miniMap=null; }
+  const h=here(); miniMap=L.map("mini",{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false,boxZoom:false,keyboard:false}).setView([h.lat,h.lon],9);
+  baseLayer("std").addTo(miniMap);
+  L.circleMarker([h.lat,h.lon],{radius:7,color:"#121212",weight:2,fillColor:"#ffeb3b",fillOpacity:1}).addTo(miniMap);
+  S.act.forEach(a=>{ const k=KIND[a.kind]||KIND.alert; L.circleMarker([a.lat,a.lon],{radius:5,color:"#121212",weight:1,fillColor:k[0],fillOpacity:1}).addTo(miniMap); });
 }
 
-/* ============ Render: Início ============ */
-const WMO = {0:"Céu limpo",1:"Pouco nublado",2:"Parcialmente nublado",3:"Nublado",45:"Nevoeiro",48:"Nevoeiro com geada",51:"Chuvisco fraco",53:"Chuvisco",55:"Chuvisco forte",
-  61:"Chuva fraca",63:"Chuva",65:"Chuva forte",66:"Chuva gelada",67:"Chuva gelada forte",71:"Neve fraca",73:"Neve",75:"Neve forte",77:"Grãos de neve",
-  80:"Aguaceiros fracos",81:"Aguaceiros",82:"Aguaceiros fortes",85:"Aguaceiros de neve",86:"Aguaceiros de neve fortes",95:"Trovoada",96:"Trovoada com granizo",99:"Trovoada com granizo forte"};
+/* ======================================================================
+   FICHAS
+   ====================================================================== */
+function openSheet(html){ $("#sheet").innerHTML=`<div class="grab"></div>`+html; $("#sheetWrap").hidden=false; $("#sheet").scrollTop=0; }
+function closeSheet(){ $("#sheetWrap").hidden=true; }
+$("#scrim").onclick=closeSheet;
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
+const dirUrl=(la,lo)=>`https://www.google.com/maps/dir/?api=1&destination=${la},${lo}`;
+async function shareIt(title,text,url){ try{ if(navigator.share){ await navigator.share({title,text,url}); return; } await navigator.clipboard.writeText(text+(url?" "+url:"")); toast("Copiado"); }catch(e){} }
+function sheetAct(x){ if(!x) return; const k=KIND[x.kind]||KIND.alert; const h=here(); const d=km(h.lat,h.lon,x.lat,x.lon);
+  openSheet(`<span class="tag" style="background:${k[1]};color:${k[0]}">${k[3]}</span><h3>${esc(x.nat)}</h3><div class="muted">${esc(x.loc||x.district)} · ${fKm(d)}</div>
+   <dl class="kv"><dt>Estado</dt><dd>${esc(x.status||"—")}</dd><dt>Início</dt><dd>${x.time?fDT(x.time)+" ("+ago(x.time)+")":"—"}</dd><dt>Operacionais</dt><dd>${x.man}</dd><dt>Meios terrestres</dt><dd>${x.terrain}</dd><dt>Meios aéreos</dt><dd>${x.aerial}</dd><dt>Distrito</dt><dd>${esc(x.district||"—")}</dd></dl>
+   <div class="row"><a class="btn y" href="${dirUrl(x.lat,x.lon)}" target="_blank" rel="noopener">${ic(P.nav,"i s")}Obter direções</a><button class="btn" id="shA">${ic(P.share,"i s")}Partilhar</button><a class="btn o" href="https://prociv.gov.pt/pt/ocorrencias/" target="_blank" rel="noopener">Ver fonte oficial</a></div>
+   <p class="small muted">Fonte: ${esc(S.actSrc)}. Em emergência ligue 112.</p>`);
+  $("#shA").onclick=()=>shareIt(x.nat,`${x.nat} — ${x.loc} (${x.status}). ${x.man} operacionais.`,""); }
+function sheetWarn(w){ if(!w) return;
+  openSheet(`<span class="tag" style="background:${LVC[w.lvl]};color:#1a1a1a">Aviso ${LVN[w.lvl]}</span> <span class="tag off">Oficial</span><h3>${esc(w.type)} — ${esc(areaName(w.area))}</h3>
+   <dl class="kv"><dt>Gravidade</dt><dd>${LVSEV[w.lvl]}</dd><dt>Início</dt><dd>${fDT(w.start)}</dd><dt>Fim</dt><dd>${fDT(w.end)}</dd></dl>${w.text?`<p>${esc(w.text)}</p>`:""}
+   <div class="row"><a class="btn y" href="https://www.ipma.pt/pt/otempo/prev-sam/?p=${encodeURIComponent(w.area)}" target="_blank" rel="noopener">Ver aviso oficial</a><button class="btn" id="shW">${ic(P.share,"i s")}Partilhar</button></div>
+   <p class="small muted">Fonte: IPMA. Siga as indicações da Proteção Civil.</p>`);
+  $("#shW").onclick=()=>shareIt("Aviso IPMA",`Aviso ${LVN[w.lvl].toLowerCase()} de ${w.type.toLowerCase()} em ${areaName(w.area)}, ${fDT(w.start)} até ${fDT(w.end)}.`,""); }
+function sheetQuake(q){ if(!q) return; const h=here();
+  openSheet(`<span class="tag" style="background:#2a1f3d;color:#b388ff">Sismo</span><h3>Magnitude ${num(q.mag,1)} — ${esc(q.region)}</h3>
+   <dl class="kv"><dt>Hora</dt><dd>${fDT(q.time)} (${ago(q.time)})</dd><dt>Profundidade</dt><dd>${num(q.depth)} km</dd><dt>Distância</dt><dd>${fKm(km(h.lat,h.lon,q.lat,q.lon))}</dd><dt>Sentido</dt><dd>${q.felt?esc(q.felt):"Sem registo"}</dd></dl>
+   <div class="row"><a class="btn y" href="https://www.ipma.pt/pt/geofisica/sismologia/" target="_blank" rel="noopener">Ver fonte oficial</a><button class="btn" data-guide="sismo">O que fazer num sismo</button></div>`);
+  $("#sheet [data-guide]").onclick=()=>{ closeSheet(); go("perfil"); openGuide("sismo"); }; }
+function sheetShelter(s){ if(!s) return; const c=SHCAT[s.cat]; const bm=LS.get("bm",[]); const on=bm.some(x=>x.id===s.id); const h=here();
+  openSheet(`<span class="tag" style="background:${c[1]};color:#1a1a1a">${c[0]}</span><h3>${esc(s.name)}</h3><div class="muted">${esc(s.addr||"")} ${fKm(km(h.lat,h.lon,s.lat,s.lon))}</div>
+   ${s.phone?`<dl class="kv"><dt>Telefone</dt><dd class="mono">${esc(s.phone)}</dd></dl>`:""}
+   <div class="row"><a class="btn y" href="${dirUrl(s.lat,s.lon)}" target="_blank" rel="noopener">${ic(P.nav,"i s")}Obter direções</a><button class="btn" id="bmB">${ic(P.star,"i s")}${on?"Remover dos favoritos":"Guardar"}</button><button class="btn" id="shS">${ic(P.share,"i s")}Partilhar</button></div>
+   <p class="small muted">Dados © OpenStreetMap. Confirme sempre no local; nem todos os abrigos estão abertos ao público.</p>`);
+  $("#bmB").onclick=()=>{ let b=LS.get("bm",[]); if(b.some(x=>x.id===s.id)){ b=b.filter(x=>x.id!==s.id); toast("Removido dos favoritos"); } else { b.unshift(s); toast("Guardado nos favoritos"); } LS.set("bm",b); sheetShelter(s); };
+  $("#shS").onclick=()=>shareIt(s.name,`${s.name} (${c[0]})`,`https://www.openstreetmap.org/?mlat=${s.lat}&mlon=${s.lon}#map=17/${s.lat}/${s.lon}`); }
+function openStory(s){ if(!s) return; if(s.k==="w") sheetWarn(S.warnings.find(x=>x.id===s.ref)); else if(s.k==="a") sheetAct(S.act.find(x=>x.id===s.ref)); else sheetQuake(S.quakes.find(x=>x.id===s.ref)); }
+function sheetStories(){ const st=stories(); const day=d=>{ const t=new Date(); t.setHours(0,0,0,0); return d>=t?"Hoje":d>=t-864e5?"Ontem":"Antes"; };
+  let g={}; st.forEach((s,i)=>(g[day(s.time)]=g[day(s.time)]||[]).push([s,i]));
+  openSheet(`<h3>Última hora</h3>`+["Hoje","Ontem","Antes"].filter(k=>g[k]).map(k=>`<div class="gtitle" style="margin:14px 0 6px">${k}</div>`+g[k].map(([s,i])=>`<button class="act" data-sti="${i}"><span class="am"><span class="t">${s.tags} ${esc(s.t)}</span><span class="s">${esc(s.s)} · ${ago(s.time)}</span></span></button>`).join("")).join(""));
+  $("#sheet").querySelectorAll("[data-sti]").forEach(b=>b.onclick=()=>openStory(st[+b.dataset.sti])); }
+function sheetHistory(){ const h=here(), a=nearestArea(h.lat,h.lon); const l=LS.get("hist",[]).filter(x=>x.area===a&&new Date(x.end)<Date.now());
+  openSheet(`<h3>Alertas arquivados</h3><div class="muted small">${esc(areaName(a))} · últimos 30 dias (guardados neste telemóvel)</div>`+(l.length?l.map(x=>`<div class="act" style="cursor:default"><span class="ai" style="--ac:#1a1a1a;--ac-bg:${LVC[x.lvl]}">${ic(P.alert)}</span><span class="am"><span class="t">${esc(x.type)} · ${LVN[x.lvl]}</span><span class="m">${fDT(new Date(x.start))} → ${fDT(new Date(x.end))}</span></span></div>`).join(""):`<p class="empty">Sem alertas nos últimos 30 dias.</p>`)); }
 
-function renderStatus(){
-  const a = myArea(); const name = AREAS[a] ? AREAS[a][0] : a;
-  const mine = S.warnings.filter(w => w.area === a);
-  const now = Date.now();
-  const active = mine.filter(w => w.start <= now);
-  const next = mine.filter(w => w.start > now);
-  const worst = (active.length?active:mine).reduce((m,w)=>LVL[w.lvl]>LVL[m]?w.lvl:m, "green");
-  const el = $("#statusCard"); el.style.setProperty("--lvc", LVLVAR[worst]);
-  el.querySelector(".dot").style.setProperty("--lvc", LVLVAR[worst]);
-  let lvl, big, sub;
-  if(!mine.length){ lvl="Sem avisos"; big=`Sem avisos meteorológicos para ${name}`; sub="Nos próximos 3 dias, segundo o IPMA."; }
-  else if(active.length){ const w=active[0]; lvl="Aviso "+LVLNAME[w.lvl].toLowerCase()+" em vigor";
-    big=`${[...new Set(active.map(x=>x.type))].join(", ")} em ${name}`; sub=`Até ${fmtDT(w.end)}.` + (next.length?` Mais ${next.length} aviso(s) previsto(s).`:""); }
-  else { const w=next[0]; lvl="Aviso "+LVLNAME[w.lvl].toLowerCase()+" previsto"; big=`${w.type} em ${name}`; sub=`A partir de ${fmtDT(w.start)}.`; }
-  el.querySelector(".lvl").textContent = lvl; el.querySelector(".big").textContent = big; $("#statusSub").textContent = sub;
-  if(S.warnMeta && S.warnMeta.stale) $("#statusSub").textContent += " (dados guardados — sem ligação)";
-  const n = mine.length; const b=$("#warnBadge"); b.hidden = !n; b.textContent = n;
+/* ======================================================================
+   MAPA
+   ====================================================================== */
+let map, G={}, curMode="tudo", style="std", radarLayer, satLayer;
+const MODES=[["tudo","Tudo"],["alertas","Alertas"],["atividade","Atividade"],["abrigos","Abrigos"],["sismos","Sismos"],["ambiente","Ambiente"],["radar","Radar de chuva"],["satelite","Imagem de satélite"]];
+function baseLayer(s){
+  if(s==="sat") return L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Imagens © Esri"});
+  return L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19,subdomains:"abcd",attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>'});
 }
-
-function renderWx(){
-  const c=$("#wxCard"); const w=S.wx; if(!w||!w.current){ return; }
-  const cu=w.current, d=w.daily||{};
-  c.innerHTML = `<h3>Tempo agora <span class="src">Open-Meteo</span></h3>
-    <div class="metric"><span class="v">${num(cu.temperature_2m)}°</span><span class="muted">${esc(WMO[cu.weather_code]||"")}</span></div>
-    <dl class="kv"><dt>Sensação</dt><dd>${num(cu.apparent_temperature)}°</dd>
-    <dt>Mín / máx</dt><dd>${num(d.temperature_2m_min&&d.temperature_2m_min[0])}° / ${num(d.temperature_2m_max&&d.temperature_2m_max[0])}°</dd>
-    <dt>Vento</dt><dd>${num(cu.wind_speed_10m)} km/h, rajada ${num(cu.wind_gusts_10m)}</dd>
-    <dt>Chuva hoje</dt><dd>${num(d.precipitation_sum&&d.precipitation_sum[0],1)} mm</dd>
-    <dt>UV máx</dt><dd>${num(d.uv_index_max&&d.uv_index_max[0],1)}</dd></dl>`;
-}
-function aqBand(v){ if(v==null) return ["—","var(--surface2)"]; if(v<=20) return ["Boa","var(--lv-green)"]; if(v<=40) return ["Razoável","var(--lv-green)"];
-  if(v<=60) return ["Moderada","var(--lv-yellow)"]; if(v<=80) return ["Fraca","var(--lv-orange)"]; if(v<=100) return ["Muito fraca","var(--lv-red)"]; return ["Extremamente fraca","var(--lv-red)"]; }
-function renderAq(){
-  const c=$("#aqCard"); const a=S.aq; if(!a||!a.current) return; const cu=a.current; const [b,col]=aqBand(cu.european_aqi);
-  c.innerHTML = `<h3>Qualidade do ar <span class="src">CAMS</span></h3>
-    <div class="metric"><span class="v">${num(cu.european_aqi)}</span><span class="pill c ${col.includes("yellow")?"yl":""}" style="--pc:${col}">${b}</span></div>
-    <dl class="kv"><dt>PM2,5</dt><dd>${num(cu.pm2_5)} µg/m³</dd><dt>PM10</dt><dd>${num(cu.pm10)} µg/m³</dd>
-    <dt>Ozono</dt><dd>${num(cu.ozone)} µg/m³</dd><dt>NO₂</dt><dd>${num(cu.nitrogen_dioxide)} µg/m³</dd></dl>
-    <div class="small muted" style="margin-top:6px">Índice europeu (0–100+). Modelo, não estação.</div>`;
-}
-const RCMN = {1:"Reduzido",2:"Moderado",3:"Elevado",4:"Muito elevado",5:"Máximo"};
-const RCMC = {1:"var(--lv-green)",2:"var(--lv-yellow)",3:"var(--lv-orange)",4:"var(--lv-red)",5:"#7a0f0f"};
-function rcmAt(d){ const r=S.rcm[d]; if(!r||!r.local) return null; let best=null,bd=1e9;
-  for(const [dico,l] of Object.entries(r.local)){ const la=parseFloat(l.latitude), lo=parseFloat(l.longitude); if(isNaN(la)) continue;
-    const dd=km(cfg.lat,cfg.lon,la,lo); if(dd<bd){bd=dd;best={dico,v:l.data&&l.data.rcm,date:r.dataPrev};} } return best; }
-function renderRcm(){
-  const c=$("#rcmCard"); const t=rcmAt(0), m=rcmAt(1); if(!t) return;
-  const bar = v => `<div class="rcm">${[1,2,3,4,5].map(i=>`<i class="${i<=v?"on":""}" style="--pc:${RCMC[v]}"></i>`).join("")}</div>`;
-  const col = (lab,x) => x ? `<div><div class="small muted">${lab}</div><div style="font-weight:700;font-size:17px">${RCMN[x.v]||"—"}</div>${bar(x.v)}</div>` : "";
-  c.innerHTML = `<h3>Risco de incêndio rural <span class="src">IPMA</span></h3><div class="grid2">${col("Hoje",t)}${col("Amanhã",m)}</div>
-    <div class="small muted" style="margin-top:8px">Concelho mais próximo (código ${esc(t.dico)}). Com risco muito elevado ou máximo, o uso de fogo e maquinaria tem restrições — confirme em <a href="https://www.icnf.pt" target="_blank" rel="noopener">icnf.pt</a>.</div>`;
-}
-function renderFires(){
-  const c=$("#fireCard"); const R=cfg.radius;
-  const near = S.fires.map(f=>({...f,d:km(cfg.lat,cfg.lon,f.lat,f.lon)})).filter(f=>f.d<=R).sort((a,b)=>a.d-b.d);
-  const total = S.fires.length;
-  let h = `<h3>Ocorrências perto de si <span class="src">ANEPC via fogos.pt</span></h3>`;
-  h += `<div class="small muted">${near.length} num raio de ${R} km · ${total} ativas no país</div>`;
-  if(near.length){ h += `<ul class="list" style="margin-top:8px">` + near.slice(0,6).map(f=>`<li>
-      <div class="li-ic" style="background:color-mix(in srgb,var(--fire) 16%,transparent);color:var(--fire)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${f.isFire?IC.fire:'<path d="M12 3L2 20h20z"/><path d="M12 10v4"/>'}</svg></div>
-      <div class="li-main"><div class="li-t">${esc(f.nat)}</div><div class="li-s">${esc(f.loc)} · ${esc(f.status)}</div>
-      <div class="li-s mono">${f.man} operacionais · ${f.terrain} meios terrestres · ${f.aerial} aéreos</div></div>
-      <div class="li-r">${fmtKm(f.d)}</div></li>`).join("") + `</ul>`; }
-  if(S.firesMeta && S.firesMeta.stale) h += `<div class="err">Sem ligação — a mostrar dados de ${ago(S.firesMeta.t)}.</div>`;
-  c.innerHTML = h;
-}
-function renderQuakes(){
-  const c=$("#quakeCard"); const R=Math.max(cfg.radius,100);
-  const wk = Date.now()-7*864e5;
-  const list = S.quakes.map(q=>({...q,d:km(cfg.lat,cfg.lon,q.lat,q.lon)}));
-  const near = list.filter(q=>q.d<=R && q.time>=wk);
-  const felt = list.filter(q=>q.felt && q.time>=wk);
-  const show = (near.length?near:felt).slice(0,6);
-  let h = `<h3>Sismos recentes <span class="src">IPMA</span></h3><div class="small muted">${near.length} nos últimos 7 dias num raio de ${R} km · ${list.length} registados em 30 dias</div>`;
-  if(!near.length && felt.length) h += `<div class="small muted">Sismos sentidos em Portugal esta semana:</div>`;
-  if(show.length) h += `<ul class="list" style="margin-top:8px">`+show.map(q=>`<li>
-    <div class="li-ic" style="background:color-mix(in srgb,var(--quake) 16%,transparent);color:var(--quake)">${num(q.mag,1)}</div>
-    <div class="li-main"><div class="li-t">${esc(q.region)}</div><div class="li-s">${fmtDT(q.time)} · ${num(q.depth)} km prof.${q.felt?` · sentido (${esc(q.felt)})`:""}</div></div>
-    <div class="li-r">${fmtKm(q.d)}</div></li>`).join("")+`</ul>`;
-  c.innerHTML = h;
-}
-
-/* ============ Render: Avisos ============ */
-function renderWarnings(){
-  const chips=$("#lvlChips");
-  chips.innerHTML = ["yellow","orange","red"].map(l=>`<button class="chip" data-l="${l}" aria-pressed="${S.lvlFilter.has(l)}"><i style="--pc:${LVLVAR[l]}"></i>${LVLNAME[l]}</button>`).join("");
-  chips.querySelectorAll(".chip").forEach(b=>b.onclick=()=>{ const l=b.dataset.l; S.lvlFilter.has(l)?S.lvlFilter.delete(l):S.lvlFilter.add(l); renderWarnings(); });
-  const a = myArea();
-  let ws = S.warnings.filter(w=>S.lvlFilter.has(w.lvl));
-  if(S.scope==="mine") ws = ws.filter(w=>w.area===a);
-  const box=$("#warnList");
-  if(!ws.length){ box.innerHTML = `<div class="card empty">${S.scope==="mine" ? `Sem avisos ${[...S.lvlFilter].map(l=>LVLNAME[l].toLowerCase()).join("/")} para ${esc(AREAS[a]?AREAS[a][0]:a)}.` : "Sem avisos com estes filtros."}</div>`; }
-  else {
-    const groups = {}; ws.forEach(w=>(groups[w.area]=groups[w.area]||[]).push(w));
-    const order = Object.keys(groups).sort((x,y)=> (x===a?-1:y===a?1:0) || Math.max(...groups[y].map(w=>LVL[w.lvl]))-Math.max(...groups[x].map(w=>LVL[w.lvl])) || (AREAS[x]?.[0]||x).localeCompare(AREAS[y]?.[0]||y,"pt"));
-    box.innerHTML = order.map(k=>{ const g=groups[k]; const top=g.reduce((m,w)=>LVL[w.lvl]>LVL[m]?w.lvl:m,"green");
-      return `<div class="card"><div class="area-h"><span class="n">${esc(AREAS[k]?AREAS[k][0]:k)}</span><span class="pill c ${top==="yellow"?"yl":""}" style="--pc:${LVLVAR[top]}">${LVLNAME[top]}</span></div>`+
-      g.map(w=>{ const on = w.start<=Date.now(); return `<div class="warn"><div class="bar" style="--pc:${LVLVAR[w.lvl]}"></div><div style="min-width:0">
-        <div class="t">${esc(w.type)} · ${LVLNAME[w.lvl]}${on?` <span class="pill">Em vigor</span>`:""}</div>
-        <div class="p">${fmtDT(w.start)} → ${fmtDT(w.end)}</div>${w.text?`<div class="x">${esc(w.text)}</div>`:""}</div></div>`; }).join("")+`</div>`; }).join("");
-  }
-  if(S.warnMeta) box.insertAdjacentHTML("beforeend", `<div class="small muted">Atualizado ${ago(S.warnMeta.t)}${S.warnMeta.stale?" — sem ligação, a mostrar dados guardados":""}.</div>`);
-  renderHistory();
-}
-function logHistory(){
-  const h = LS.get("hist", []); const keys = new Set(h.map(x=>x.k));
-  S.warnings.forEach(w=>{ const k=w.area+"|"+w.type+"|"+w.lvl+"|"+w.start.toISOString(); if(!keys.has(k)){ h.unshift({k,area:w.area,type:w.type,lvl:w.lvl,start:w.start.toISOString(),end:w.end.toISOString()}); keys.add(k);} });
-  const cut = Date.now()-30*864e5; LS.set("hist", h.filter(x=>new Date(x.end)>cut).slice(0,300));
-}
-function renderHistory(){
-  const a=myArea(); const h=LS.get("hist",[]).filter(x=>x.area===a && new Date(x.end)<Date.now());
-  $("#histCard").innerHTML = h.length ? `<ul class="list">`+h.slice(0,15).map(x=>`<li><div class="li-ic" style="background:${LVLVAR[x.lvl]}"></div>
-    <div class="li-main"><div class="li-t">${esc(x.type)} · ${LVLNAME[x.lvl]}</div><div class="li-s mono">${fmtDT(new Date(x.start))} → ${fmtDT(new Date(x.end))}</div></div></li>`).join("")+`</ul>`
-    : `<div class="empty">Os avisos que já terminaram para ${esc(AREAS[a]?.[0]||a)} aparecem aqui (últimos 30 dias, guardados a partir da primeira utilização).</div>`;
-}
-$("#scMine").onclick=()=>{ S.scope="mine"; $("#scMine").setAttribute("aria-pressed","true"); $("#scAll").setAttribute("aria-pressed","false"); renderWarnings(); };
-$("#scAll").onclick=()=>{ S.scope="all"; $("#scAll").setAttribute("aria-pressed","true"); $("#scMine").setAttribute("aria-pressed","false"); renderWarnings(); };
-
-/* ============ Mapa ============ */
-let map, L_me, L_fire, L_quake, L_radar, L_rcm, L_poi;
+let baseL, labelsL;
+function setStyle(s){ style=s; if(baseL) map.removeLayer(baseL); if(labelsL) map.removeLayer(labelsL);
+  baseL=baseLayer(s==="std"?"std":"sat").addTo(map); baseL.bringToBack();
+  if(s==="hyb") labelsL=L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,pane:"overlayPane"}).addTo(map); }
 function initMap(){
-  if(map) { map.invalidateSize(); return; }
-  map = L.map("map",{ zoomControl:true, attributionControl:true }).setView([cfg.lat,cfg.lon], 9);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{ maxZoom:18, attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
-  L_fire = L.layerGroup(); L_quake = L.layerGroup(); L_rcm = L.layerGroup(); L_poi = L.layerGroup(); L_me = L.layerGroup().addTo(map);
-  ["lyFire","lyQuake","lyRadar","lyRcm","lyPoi"].forEach(id=>$("#"+id).onchange=syncLayers);
-  $("#poiBtn").onclick=loadPoi;
-  drawMap(); syncLayers();
+  if(map){ map.invalidateSize(); return; }
+  const h=here(); map=L.map("map",{zoomControl:false,attributionControl:true,worldCopyJump:true}).setView([h.lat,h.lon],9);
+  setStyle("std");
+  ["me","alertas","atividade","abrigos","sismos","ambiente"].forEach(k=>G[k]=L.layerGroup());
+  G.me.addTo(map);
+  $("#modes").innerHTML=MODES.map(([k,n])=>`<button class="chip" data-m="${k}" aria-pressed="${k===curMode}">${n}</button>`).join("");
+  $("#modes").querySelectorAll(".chip").forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+  $("#styleBtn").onclick=()=>{ const n={std:"sat",sat:"hyb",hyb:"std"}[style]; setStyle(n); toast({std:"Mapa padrão",sat:"Satélite",hyb:"Híbrido"}[n]); };
+  $("#meBtn").onclick=()=>{ const h=here(); map.setView([h.lat,h.lon],11); };
+  map.on("moveend",()=>{ if(curMode==="abrigos"||curMode==="tudo") maybeLoadShelters(); });
+  drawMap(); setMode(curMode);
 }
+function pinIcon(color,inner,size=30){ return L.divIcon({className:"",iconSize:[size,size],iconAnchor:[size/2,size],html:`<div class="pin" style="background:${color};width:${size}px;height:${size}px;color:#121212"><span>${inner}</span></div>`}); }
+function dotIcon(color,txt,size){ return L.divIcon({className:"",iconSize:[size,size],iconAnchor:[size/2,size/2],html:`<div class="dotm" style="--dc:${color};background:${color};width:${size}px;height:${size}px">${txt||""}</div>`}); }
 function drawMap(){
-  if(!map) return;
-  L_me.clearLayers(); L.circleMarker([cfg.lat,cfg.lon],{radius:8,color:"#fff",weight:3,fillColor:"#1f4fbf",fillOpacity:1}).bindPopup("<b>Está aqui</b><br>"+esc(cfg.place)).addTo(L_me);
-  L.circle([cfg.lat,cfg.lon],{radius:cfg.radius*1000,color:"#1f4fbf",weight:1,fill:false,dashArray:"4 6"}).addTo(L_me);
-  L_fire.clearLayers();
-  S.fires.forEach(f=>{ L.circleMarker([f.lat,f.lon],{radius:7+Math.min(10,Math.sqrt(f.man)),color:"#fff",weight:1.5,fillColor:f.statusColor||"#d9480f",fillOpacity:.9})
-    .bindPopup(`<b>${esc(f.nat)}</b><br>${esc(f.loc)}<br>Estado: ${esc(f.status)}<br>${f.man} operacionais · ${f.terrain} terrestres · ${f.aerial} aéreos<br><span style="opacity:.7">${f.time?fmtDT(f.time):""}</span>`).addTo(L_fire); });
-  L_quake.clearLayers();
-  S.quakes.forEach(q=>{ const age=(Date.now()-q.time)/864e5; L.circleMarker([q.lat,q.lon],{radius:3+Math.max(0,q.mag||0)*2.2,color:"#7b3fbf",weight:1,fillColor:"#7b3fbf",fillOpacity:age<1?.85:age<7?.5:.2})
-    .bindPopup(`<b>M ${num(q.mag,1)} · ${esc(q.region)}</b><br>${fmtDT(q.time)}<br>Profundidade ${num(q.depth)} km${q.felt?`<br>Sentido: ${esc(q.felt)}`:""}`).addTo(L_quake); });
-  L_rcm.clearLayers();
-  const r=S.rcm[0]; if(r&&r.local) Object.values(r.local).forEach(l=>{ const v=l.data&&l.data.rcm; if(!v) return;
-    L.circleMarker([+l.latitude,+l.longitude],{radius:6,stroke:false,fillColor:["","#2e8b57","#e0b100","#e86a10","#c81e1e","#7a0f0f"][v],fillOpacity:.75}).bindPopup(`Risco de incêndio hoje: <b>${RCMN[v]}</b>`).addTo(L_rcm); });
+  if(!map) return; const h=here();
+  G.me.clearLayers(); L.circleMarker([h.lat,h.lon],{radius:9,color:"#121212",weight:3,fillColor:"#ffeb3b",fillOpacity:1}).addTo(G.me);
+  L.circle([h.lat,h.lon],{radius:cfg.radius*1000,color:"#ffeb3b",weight:1,opacity:.6,fill:false,dashArray:"4 6",interactive:false}).addTo(G.me);
+  G.atividade.clearLayers(); S.act.forEach(a=>{ const k=KIND[a.kind]||KIND.alert; L.marker([a.lat,a.lon],{icon:pinIcon(k[0],`<svg class="i s" viewBox="0 0 24 24" style="width:15px;height:15px">${k[2]}</svg>`)}).on("click",()=>sheetAct(a)).addTo(G.atividade); });
+  G.sismos.clearLayers(); S.quakes.forEach(q=>{ const age=(Date.now()-q.time)/864e5; const s=Math.round(14+Math.max(0,q.mag||0)*5); L.marker([q.lat,q.lon],{icon:dotIcon(age<1?"#b388ff":age<7?"#7e57c2":"#4a3a6a",(q.mag>=2.5?num(q.mag,1):""),s),opacity:age<7?1:.6}).on("click",()=>sheetQuake(q)).addTo(G.sismos); });
+  G.alertas.clearLayers(); const byA={}; S.warnings.forEach(w=>{ if(!byA[w.area]||LVL[w.lvl]>LVL[byA[w.area].lvl]) byA[w.area]=w; });
+  Object.values(byA).forEach(w=>{ const a=AREAS[w.area]; if(!a) return; L.circle([a[1],a[2]],{radius:w.area.length&&/^M|^A[OC]/.test(w.area)?18000:32000,color:LVC[w.lvl],weight:2,fillColor:LVC[w.lvl],fillOpacity:.25}).on("click",()=>sheetWarn(w)).addTo(G.alertas);
+    L.marker([a[1],a[2]],{icon:pinIcon(LVC[w.lvl],`<svg class="i s" viewBox="0 0 24 24" style="width:15px;height:15px">${P.alert}</svg>`)}).on("click",()=>sheetWarn(w)).addTo(G.alertas); });
+  G.ambiente.clearLayers(); const r=S.rcm[0]; if(r&&r.local) Object.values(r.local).forEach(l=>{ const v=l.data&&l.data.rcm; if(!v) return; L.circleMarker([+l.latitude,+l.longitude],{radius:7,stroke:false,fillColor:RCMC[v],fillOpacity:.7}).bindTooltip(`Risco de incêndio: ${RCMN[v]}`).addTo(G.ambiente); });
+  drawShelters();
 }
-async function syncLayers(){
-  const tog=(on,ly)=>{ if(on) ly.addTo(map); else map.removeLayer(ly); };
-  tog($("#lyFire").checked,L_fire); tog($("#lyQuake").checked,L_quake); tog($("#lyRcm").checked,L_rcm); tog($("#lyPoi").checked,L_poi);
-  $("#poiBtn").hidden = !$("#lyPoi").checked;
-  if($("#lyPoi").checked && !L_poi.getLayers().length) loadPoi();
-  if($("#lyRadar").checked){
-    if(!L_radar){ try{ const r=await getJSON("https://api.rainviewer.com/public/weather-maps.json"); const p=r.data.radar.past; const last=p[p.length-1];
-        L_radar=L.tileLayer(`${r.data.host}${last.path}/256/{z}/{x}/{y}/2/1_1.png`,{opacity:.7,maxNativeZoom:7,maxZoom:18,attribution:"Radar © RainViewer"});
-        $("#mapLegend").textContent="Radar: "+TF.format(new Date(last.time*1000));
-      }catch(e){ toast("Não foi possível carregar o radar."); $("#lyRadar").checked=false; return; } }
-    L_radar.addTo(map);
-  } else if(L_radar) map.removeLayer(L_radar);
-}
-async function loadPoi(){
-  const b=map.getBounds(); if(map.getZoom()<10){ toast("Aproxime o mapa (zoom) para procurar pontos úteis."); return; }
-  const bb=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(x=>x.toFixed(4)).join(",");
-  const q=`[out:json][timeout:25];(nwr["amenity"="hospital"](${bb});nwr["amenity"="fire_station"](${bb});nwr["amenity"="police"](${bb});nwr["emergency"="assembly_point"](${bb});nwr["amenity"="shelter"]["shelter_type"!="public_transport"](${bb}););out center 300;`;
-  toast("A procurar…");
-  try{
-    const r=await getJSON("https://overpass-api.de/api/interpreter",{ opts:{ method:"POST", body:"data="+encodeURIComponent(q), headers:{"Content-Type":"application/x-www-form-urlencoded"} } });
-    L_poi.clearLayers(); const T={hospital:["Hospital","#c81e1e","H"],fire_station:["Bombeiros","#e86a10","B"],police:["Polícia","#1f4fbf","P"],assembly_point:["Ponto de encontro","#2e8b57","E"],shelter:["Abrigo","#5a6578","A"]};
-    (r.data.elements||[]).forEach(e=>{ const la=e.lat??e.center?.lat, lo=e.lon??e.center?.lon; if(la==null) return; const t=e.tags||{};
-      const k = t.emergency==="assembly_point"?"assembly_point":t.amenity; const d=T[k]; if(!d) return;
-      L.marker([la,lo],{icon:L.divIcon({className:"",html:`<div style="background:${d[1]};color:#fff;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font:700 12px/1 system-ui;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)">${d[2]}</div>`,iconSize:[24,24],iconAnchor:[12,12]})})
-        .bindPopup(`<b>${esc(t.name||d[0])}</b><br>${d[0]}${t.phone?`<br>${esc(t.phone)}`:""}<br><a href="https://www.google.com/maps/dir/?api=1&destination=${la},${lo}" target="_blank" rel="noopener">Direções</a>`).addTo(L_poi); });
-    toast(L_poi.getLayers().length+" pontos encontrados");
-  }catch(e){ toast("O serviço OpenStreetMap não respondeu. Tente daqui a pouco."); }
-}
+function drawShelters(){ if(!map) return; G.abrigos.clearLayers(); const bm=new Set(LS.get("bm",[]).map(x=>x.id));
+  const list=[...S.shelters,...LS.get("bm",[]).filter(b=>!S.shelters.some(s=>s.id===b.id))];
+  list.forEach(s=>{ const c=SHCAT[s.cat]; L.marker([s.lat,s.lon],{icon:pinIcon(c[1],`<svg class="i s" viewBox="0 0 24 24" style="width:15px;height:15px">${bm.has(s.id)?P.star:c[2]}</svg>`,s.cat==="bunker"||s.cat==="shelter"?32:26)}).on("click",()=>sheetShelter(s)).addTo(G.abrigos); }); }
+let shLast=null, shBusy=false;
+async function maybeLoadShelters(){ if(shBusy||map.getZoom()<8) return; const c=map.getCenter(); if(shLast&&km(c.lat,c.lng,shLast.lat,shLast.lng)<8) return;
+  shBusy=true; $("#mlegend").textContent="A procurar abrigos e pontos seguros…";
+  try{ const add=await loadShelters(c.lat,c.lng,15); const ids=new Set(S.shelters.map(x=>x.id)); add.forEach(x=>{ if(!ids.has(x.id)) S.shelters.push(x); }); shLast=c; drawShelters(); legend(); }
+  catch(e){ $("#mlegend").textContent="O OpenStreetMap não respondeu. Mova o mapa para tentar de novo."; }
+  shBusy=false; }
+async function setMode(m){
+  curMode=m; if(!map){ return; }
+  $("#modes").querySelectorAll(".chip").forEach(b=>b.setAttribute("aria-pressed",b.dataset.m===m));
+  const show={tudo:["alertas","atividade","abrigos","sismos"],alertas:["alertas"],atividade:["atividade"],abrigos:["abrigos"],sismos:["sismos"],ambiente:["ambiente"],radar:["alertas"],satelite:[]}[m]||[];
+  ["alertas","atividade","abrigos","sismos","ambiente"].forEach(k=>show.includes(k)?G[k].addTo(map):map.removeLayer(G[k]));
+  if(radarLayer){ map.removeLayer(radarLayer); } if(satLayer){ map.removeLayer(satLayer); }
+  if(m==="radar"){ try{ const r=await getJSON("https://api.rainviewer.com/public/weather-maps.json"); const p=r.data.radar.past, last=p[p.length-1];
+      radarLayer=L.tileLayer(`${r.data.host}${last.path}/256/{z}/{x}/{y}/2/1_1.png`,{opacity:.75,maxNativeZoom:7,maxZoom:19,attribution:"Radar © RainViewer"}).addTo(map); S.radarT=new Date(last.time*1000);
+      if(map.getZoom()>8) map.setZoom(7); }catch(e){ toast("Não foi possível carregar o radar."); } }
+  if(m==="satelite"){ const d=new Date(Date.now()-864e5).toISOString().slice(0,10);
+    satLayer=L.tileLayer(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${d}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,{maxNativeZoom:9,maxZoom:19,attribution:"Imagem: NASA GIBS (VIIRS)"}).addTo(map); S.satD=d; if(map.getZoom()>8) map.setZoom(6); }
+  if(m==="abrigos"&&map.getZoom()<11){ const c=map.getCenter(); map.setView(c,11); }
+  if(m==="abrigos"||m==="tudo") maybeLoadShelters();
+  legend(); }
+function legend(){ const h=here(); const m=curMode; let t="";
+  if(m==="tudo") t=`${S.warnings.filter(w=>w.area===nearestArea(h.lat,h.lon)).length} alertas · ${S.act.length} ocorrências · ${S.shelters.length} pontos seguros`;
+  if(m==="alertas") t=`${S.warnings.length} avisos IPMA ativos ou previstos`;
+  if(m==="atividade") t=`${S.act.length} ocorrências ativas · ${S.actSrc}`;
+  if(m==="abrigos") t=`${S.shelters.length} abrigos, bunkers e pontos seguros (aproxime para ver mais)`;
+  if(m==="sismos") t=`${S.quakes.length} sismos nos últimos 30 dias · IPMA`;
+  if(m==="ambiente") t=`Risco de incêndio hoje por concelho · IPMA`;
+  if(m==="radar") t=S.radarT?`Radar de chuva às ${TF.format(S.radarT)}`:"Radar de chuva";
+  if(m==="satelite") t=`Imagem de satélite de ${S.satD||"ontem"} · NASA`;
+  $("#mlegend").textContent=t; }
 
-/* ============ Guias ============ */
-const IC = {
-  bag:'<path d="M6 8h12l1 12H5z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><path d="M9 13h6"/>',
-  quake:'<path d="M2 12h4l2-5 3 10 3-8 2 3h6"/>',
-  wave:'<path d="M2 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/><path d="M2 19c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/><path d="M12 4v6M9 7l3-3 3 3"/>',
-  fire:'<path d="M12 22c4 0 7-3 7-7 0-5-5-7-4-12-3 2-5 5-5 8-1-1-2-2-2-4-2 2-3 5-3 8 0 4 3 7 7 7z"/>',
-  flood:'<path d="M3 10l9-6 9 6"/><path d="M5 10v4M19 10v4"/><path d="M2 18c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/>',
-  wind:'<path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h16a3 3 0 1 1-3 3"/><path d="M3 16h8"/>',
-  heat:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/>',
-  cold:'<path d="M12 2v20M4 7l16 10M4 17L20 7"/><path d="M9 4l3 2 3-2M9 20l3-2 3 2"/>',
-  home:'<path d="M4 11l8-7 8 7v9H4z"/><path d="M9 20v-5h6v5"/><path d="M8 11h8"/>',
-  phone:'<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>'
-};
-const GUIDES = [
- { id:"kit", ic:"bag", t:"Mochila de emergência", s:"O que ter pronto em casa", lead:"Uma mochila preparada permite sair de casa em minutos ou aguentar alguns dias sem serviços (água, luz, comunicações).", check:true,
-   sec:[["Essencial",["Água engarrafada para vários dias, para todas as pessoas da casa","Alimentos que não precisem de frio nem de cozinhar (enlatados, barras, frutos secos) e abre-latas","Rádio a pilhas ou de manivela, com pilhas de reserva","Lanterna e pilhas de reserva","Estojo de primeiros socorros","Apito, para pedir ajuda","Carregador portátil (powerbank) carregado e cabos","Algum dinheiro em notas e moedas"]],
-        ["Saúde",["Medicação habitual para vários dias, com receitas ou lista dos medicamentos","Se alguém em casa tem diabetes: insulina numa bolsa térmica, material da bomba ou canetas, sensores, glucómetro e tiras, e açúcar de absorção rápida","Óculos ou lentes de reserva","Máscaras e desinfetante"]],
-        ["Documentos e contactos",["Cópias de documentos de identificação e seguros num saco impermeável","Lista em papel de contactos importantes (o telemóvel pode ficar sem bateria)","Ponto de encontro combinado com a família"]],
-        ["Conforto",["Roupa quente, impermeável e calçado resistente","Manta térmica","Artigos de higiene","Canivete multiusos","Comida e água para animais de estimação"]]],
-   foot:"Reveja a mochila de 6 em 6 meses: validade da água, comida, medicamentos e pilhas." },
- { id:"sismo", ic:"quake", t:"Sismo", s:"Antes, durante e depois", lead:"Os sismos não se preveem. Portugal continental, o Algarve, a região de Lisboa e os Açores têm risco sísmico significativo.",
-   key:"Durante: BAIXAR, PROTEGER, AGUARDAR.",
-   sec:[["Antes",["Fixe às paredes móveis altos, estantes e esquentadores","Guarde objetos pesados nas prateleiras de baixo","Identifique em cada divisão os sítios seguros: debaixo de mesas resistentes, junto a paredes interiores","Saiba onde desligar a água, o gás e a eletricidade"]],
-        ["Durante",["Dentro de casa: baixe-se, proteja a cabeça e o pescoço debaixo de uma mesa resistente e agarre-se a ela até o tremor parar","Afaste-se de janelas, espelhos e móveis que possam cair","Não corra para a rua nem use elevadores","Na rua: afaste-se de edifícios, postes e cabos elétricos","A conduzir: pare longe de pontes, túneis e edifícios e fique dentro do carro"]],
-        ["Depois",["Conte com réplicas","Verifique se há feridos; ligue 112 apenas em caso de emergência real para não congestionar as linhas","Cheire o ar: se suspeitar de fuga de gás, não acenda luzes nem chamas, abra janelas e saia","Se vive junto ao mar e o sismo foi forte ou longo, afaste-se da costa de imediato (ver Tsunami)","Ouça a rádio e siga as indicações da Proteção Civil"]]] },
- { id:"tsunami", ic:"wave", t:"Tsunami", s:"Na costa e nas praias", lead:"Um sismo forte sentido junto à costa pode ser o único aviso. Não espere por alertas oficiais.",
-   key:"Sismo forte junto ao mar ou o mar a recuar de repente: suba para zonas altas ou afaste-se da costa a pé, já.",
-   sec:[["Sinais naturais",["Sismo forte ou prolongado sentido na costa","Recuo anormal e rápido do mar","Ruído forte vindo do mar"]],
-        ["O que fazer",["Vá a pé para zonas altas ou para o interior, o mais longe possível da linha de costa","Se não conseguir sair, suba para os andares mais altos de um edifício sólido","Não vá à praia ver o mar","Uma onda pode ser seguida de outras, durante horas; só regresse quando as autoridades o indicarem"]],
-        ["Antes",["Conheça as zonas altas e os caminhos de evacuação perto de casa, do trabalho e da praia que frequenta","Em algumas praias e cidades há sinalética de evacuação: siga-a"]]] },
- { id:"incendio", ic:"fire", t:"Incêndio rural", s:"Prevenir e proteger-se", lead:"A maior parte dos incêndios rurais tem origem humana. Prevenir e preparar a casa faz diferença.",
-   sec:[["Prevenir",["Mantenha a faixa de gestão de combustível à volta da casa limpa de mato, conforme a lei","Não faça queimas nem queimadas sem autorização e nunca com risco elevado ou superior","Não lance beatas pela janela nem use maquinaria que faça faíscas em dias de risco elevado","Consulte o risco de incêndio diário na app (separador Início)"]],
-        ["Se vir um incêndio",["Ligue 112 e indique o local com o máximo de pormenor","Afaste-se no sentido contrário ao vento e ao avanço do fogo"]],
-        ["Se o fogo se aproximar de casa",["Siga as ordens das autoridades; se mandarem sair, saia cedo","Feche portas e janelas, retire cortinas de junto das janelas e afaste móveis de jardim e lenha da casa","Molhe o terreno à volta da casa se for seguro, e tenha mangueiras prontas","Se ficar cercado, abrigue-se dentro de casa, que é mais segura do que a rua ou o carro"]],
-        ["Na estrada",["Não circule em zonas de incêndio","Se for apanhado, não saia do carro: feche janelas e ventilação, acenda os faróis e baixe-se abaixo do nível das janelas"]],
-        ["Fumo",["Fique dentro de casa com janelas fechadas","Quem tem asma ou doenças respiratórias deve ter especial cuidado; veja a qualidade do ar no separador Início"]]] },
- { id:"cheias", ic:"flood", t:"Cheias e inundações", s:"Chuva forte e galgamentos", lead:"Em poucos minutos, a chuva intensa pode inundar ruas, caves e passagens inferiores.",
-   key:"Nunca atravesse zonas inundadas a pé ou de carro. Poucos centímetros de água em corrente bastam para arrastar uma pessoa ou um carro.",
-   sec:[["Antes",["Limpe caleiras, algerozes e sarjetas junto a casa","Guarde documentos e bens de valor em sítios altos","Saiba se a sua casa ou o seu caminho habitual ficam em zona inundável"]],
-        ["Durante",["Afaste-se de rios, ribeiras e linhas de água","Não fique em caves, garagens subterrâneas nem passagens inferiores","Desligue a eletricidade se a água começar a entrar em casa e se for seguro","Suba para os andares de cima"]],
-        ["Depois",["Não use água da torneira até ter a certeza de que é potável","Não ligue aparelhos elétricos que tenham estado molhados","Fotografe os danos para o seguro"]]] },
- { id:"vento", ic:"wind", t:"Tempestade e vento forte", s:"Depressões e tempo severo", lead:"Com aviso laranja ou vermelho de vento ou agitação marítima, reduza deslocações e afaste-se da costa.",
-   sec:[["Antes",["Prenda ou recolha vasos, toldos, estendais e objetos soltos em varandas","Verifique telhados e janelas","Carregue telemóveis e powerbanks"]],
-        ["Durante",["Evite andar junto a árvores, andaimes, muros e estruturas soltas","Não vá a paredões, molhes ou praias ver o mar","A conduzir: abrande, segure bem o volante e tenha cuidado com camiões, autocaravanas e reboques","Com trovoada: fique dentro de casa ou do carro; não se abrigue debaixo de árvores"]]] },
- { id:"calor", ic:"heat", t:"Calor extremo", s:"Ondas de calor", lead:"O calor intenso é especialmente perigoso para idosos, crianças, grávidas e pessoas com doenças crónicas.",
-   sec:[["Proteger-se",["Beba água regularmente, mesmo sem sede; evite álcool e bebidas muito açucaradas","Fique em locais frescos nas horas de maior calor e evite esforço físico ao ar livre","Feche persianas durante o dia e areje a casa à noite","Use roupa leve e clara, chapéu e protetor solar"]],
-        ["Cuidados extra",["Nunca deixe crianças, idosos ou animais dentro de um carro parado","Guarde medicamentos sensíveis ao calor, como a insulina, longe do sol e de fontes de calor; dispositivos médicos (bombas, sensores) podem ser afetados por temperaturas altas","Visite ou ligue a familiares e vizinhos idosos ou que vivam sozinhos"]],
-        ["Sinais de alerta",["Pele quente e seca, confusão, náuseas, dores de cabeça fortes ou desmaio podem ser golpe de calor: ligue 112, leve a pessoa para a sombra e arrefeça-a","Para aconselhamento de saúde não urgente, ligue SNS 24: 808 24 24 24"]]] },
- { id:"frio", ic:"cold", t:"Frio e neve", s:"Tempo frio e gelo", lead:"O frio aumenta o risco de doenças e de intoxicação por monóxido de carbono dentro de casa.",
-   sec:[["Em casa",["Nunca use braseiras, fogareiros ou geradores em espaços fechados","Mantenha sempre alguma ventilação quando usa aquecimentos a combustão","Vista várias camadas de roupa e tenha mantas à mão"]],
-        ["Na estrada",["Com neve ou gelo, evite deslocações; se tiver de sair, leve correntes, roupa quente, água e o depósito cheio","Siga as indicações sobre estradas cortadas"]]] },
- { id:"abrigo", ic:"home", t:"Ficar em casa (acidente químico ou radiológico)", s:"Quando mandam ficar abrigado", lead:"Em acidentes com nuvens tóxicas ou fugas de produtos perigosos, as autoridades podem pedir à população que fique dentro de casa.",
-   key:"Entrar, ficar dentro, ouvir as notícias.",
-   sec:[["O que fazer",["Entre no edifício mais próximo e feche portas e janelas","Desligue ar condicionado, ventilação e extratores","Vá para uma divisão interior, de preferência sem janelas ou com poucas","Se esteve no exterior, tire a roupa de fora e lave-se","Ouça a rádio ou a televisão e siga as indicações oficiais","Não vá buscar as crianças à escola: as escolas têm planos próprios e as crianças ficam protegidas lá","Só saia quando as autoridades indicarem"]]] }
+/* Pesquisa no mapa: cidades (Open-Meteo), alertas, ocorrências e abrigos */
+let qT; $("#mq").oninput=e=>{ const q=e.target.value.trim(); $("#mqClear").hidden=!q; clearTimeout(qT); if(q.length<2){ $("#sres").hidden=true; return; }
+  qT=setTimeout(async()=>{ const ql=q.toLowerCase(); const res=[];
+    S.warnings.filter(w=>(areaName(w.area)+" "+w.type).toLowerCase().includes(ql)).slice(0,3).forEach(w=>res.push({ic:P.alert,c:LVC[w.lvl],t:`${w.type} — ${areaName(w.area)}`,s:`Aviso ${LVN[w.lvl].toLowerCase()}`,go:()=>sheetWarn(w)}));
+    S.act.filter(a=>(a.nat+" "+a.loc+" "+a.district).toLowerCase().includes(ql)).slice(0,4).forEach(a=>res.push({ic:(KIND[a.kind]||KIND.alert)[2],c:(KIND[a.kind]||KIND.alert)[0],t:a.nat,s:a.loc,go:()=>{ map.setView([a.lat,a.lon],12); sheetAct(a); }}));
+    S.shelters.filter(s=>s.name.toLowerCase().includes(ql)).slice(0,4).forEach(s=>res.push({ic:SHCAT[s.cat][2],c:SHCAT[s.cat][1],t:s.name,s:SHCAT[s.cat][0],go:()=>{ map.setView([s.lat,s.lon],15); sheetShelter(s); }}));
+    try{ const r=await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=5&language=pt&format=json`);
+      (r.data.results||[]).forEach(x=>res.push({ic:P.pin,c:"#cac4d0",t:x.name,s:[x.admin2,x.admin1,x.country].filter(Boolean).join(", "),go:()=>map.setView([x.latitude,x.longitude],11)})); }catch(e){}
+    $("#sres").innerHTML=res.length?res.map((r,i)=>`<button data-i="${i}"><span style="color:${r.c}">${ic(r.ic,"i s")}</span><span style="min-width:0"><b style="font-weight:500">${esc(r.t)}</b><br><span class="small muted">${esc(r.s)}</span></span></button>`).join(""):`<div class="empty" style="padding:14px 16px">Sem resultados</div>`;
+    $("#sres").hidden=false; $("#sres").querySelectorAll("button").forEach(b=>b.onclick=()=>{ res[+b.dataset.i].go(); $("#sres").hidden=true; $("#mq").blur(); }); },300); };
+$("#mqClear").onclick=()=>{ $("#mq").value=""; $("#sres").hidden=true; $("#mqClear").hidden=true; };
+
+/* ======================================================================
+   PERFIL, GUIAS E DEFINIÇÕES
+   ====================================================================== */
+const GUIDES=[
+ {id:"sismo",t:"Sismo",s:"Antes, durante e depois",ic:P.quake,lead:"Os sismos não se preveem. Portugal continental, sobretudo o Algarve e a região de Lisboa, e os Açores têm risco sísmico significativo.",key:"Durante: BAIXAR, PROTEGER, AGUARDAR.",
+  sec:[["Antes",["Fixe às paredes móveis altos, estantes e esquentadores","Guarde objetos pesados nas prateleiras de baixo","Identifique em cada divisão os sítios seguros: debaixo de mesas resistentes, junto a paredes interiores","Saiba onde desligar a água, o gás e a eletricidade"]],["Durante",["Dentro de casa: baixe-se, proteja a cabeça e o pescoço debaixo de uma mesa resistente e agarre-se a ela até o tremor parar","Afaste-se de janelas, espelhos e móveis que possam cair","Não corra para a rua nem use elevadores","Na rua: afaste-se de edifícios, postes e cabos elétricos","A conduzir: pare longe de pontes, túneis e edifícios e fique dentro do carro"]],["Depois",["Conte com réplicas","Ligue 112 só em emergência real, para não congestionar as linhas","Se suspeitar de fuga de gás, não acenda luzes nem chamas, abra janelas e saia","Se vive junto ao mar e o sismo foi forte ou longo, afaste-se da costa de imediato","Ouça a rádio e siga as indicações da Proteção Civil"]]]},
+ {id:"tsunami",t:"Tsunami",s:"Na costa e nas praias",ic:'<path d="M2 15c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/><path d="M2 19c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/><path d="M12 4v6M9 7l3-3 3 3"/>',lead:"Um sismo forte sentido junto à costa pode ser o único aviso. Não espere por alertas oficiais.",key:"Sismo forte junto ao mar ou o mar a recuar de repente: vá a pé para zonas altas ou para o interior, já.",
+  sec:[["Sinais naturais",["Sismo forte ou prolongado sentido na costa","Recuo anormal e rápido do mar","Ruído forte vindo do mar"]],["O que fazer",["Vá a pé para zonas altas ou para o interior, o mais longe possível da linha de costa","Se não conseguir sair, suba para os andares mais altos de um edifício sólido","Não vá à praia ver o mar","Podem vir várias ondas durante horas; regresse só quando as autoridades o indicarem"]],["Antes",["Conheça as zonas altas e os caminhos de evacuação perto de casa, do trabalho e da praia","Siga a sinalética de evacuação onde existir"]]]},
+ {id:"incendio",t:"Incêndio rural",s:"Prevenir e proteger-se",ic:P.fire,lead:"A maior parte dos incêndios rurais tem origem humana. Prevenir e preparar a casa faz diferença.",
+  sec:[["Prevenir",["Mantenha a faixa de gestão de combustível à volta da casa limpa, conforme a lei","Não faça queimas nem queimadas sem autorização, e nunca com risco elevado ou superior","Consulte o risco de incêndio diário no painel (bloco Ambiente)"]],["Se vir um incêndio",["Ligue 112 e indique o local com o máximo de pormenor","Afaste-se no sentido contrário ao vento e ao avanço do fogo"]],["Se o fogo se aproximar de casa",["Siga as ordens das autoridades; se mandarem sair, saia cedo","Feche portas e janelas e afaste lenha e móveis de jardim da casa","Se ficar cercado, abrigue-se dentro de casa, que é mais segura do que a rua ou o carro"]],["Na estrada",["Não circule em zonas de incêndio","Se for apanhado, fique no carro: feche janelas e ventilação, acenda os faróis e baixe-se abaixo das janelas"]]]},
+ {id:"cheias",t:"Cheias e inundações",s:"Chuva forte e galgamentos",ic:P.water,lead:"Em poucos minutos, a chuva intensa pode inundar ruas, caves e passagens inferiores.",key:"Nunca atravesse zonas inundadas, a pé ou de carro.",
+  sec:[["Antes",["Limpe caleiras e sarjetas junto a casa","Guarde documentos e bens de valor em sítios altos","Saiba se a sua casa ou o seu caminho habitual ficam em zona inundável"]],["Durante",["Afaste-se de rios e linhas de água","Não fique em caves, garagens subterrâneas nem passagens inferiores","Desligue a eletricidade se a água entrar em casa e for seguro","Suba para os andares de cima"]],["Depois",["Não beba água da torneira até ter a certeza de que é potável","Não ligue aparelhos elétricos que tenham estado molhados","Fotografe os danos para o seguro"]]]},
+ {id:"vento",t:"Tempestade e vento forte",s:"Depressões e tempo severo",ic:P.wind,lead:"Com aviso laranja ou vermelho de vento ou agitação marítima, reduza deslocações e afaste-se da costa.",
+  sec:[["Antes",["Prenda ou recolha vasos, toldos, estendais e objetos soltos","Carregue telemóveis e powerbanks"]],["Durante",["Evite andar junto a árvores, andaimes, muros e estruturas soltas","Não vá a paredões, molhes ou praias ver o mar","A conduzir, abrande e tenha cuidado com veículos altos e reboques","Com trovoada, fique dentro de casa ou do carro; não se abrigue debaixo de árvores"]]]},
+ {id:"calor",t:"Calor extremo",s:"Ondas de calor",ic:P.therm,lead:"O calor intenso é especialmente perigoso para idosos, crianças, grávidas e pessoas com doenças crónicas.",
+  sec:[["Proteger-se",["Beba água regularmente, mesmo sem sede","Fique em locais frescos nas horas de maior calor","Feche persianas durante o dia e areje a casa à noite","Use roupa leve, chapéu e protetor solar"]],["Cuidados extra",["Nunca deixe crianças, idosos ou animais num carro parado","Guarde medicamentos sensíveis ao calor, como a insulina, longe do sol; bombas e sensores podem ser afetados por temperaturas altas","Ligue a familiares e vizinhos idosos ou que vivam sozinhos"]],["Sinais de alerta",["Pele quente e seca, confusão, náuseas ou desmaio podem ser golpe de calor: ligue 112, leve a pessoa para a sombra e arrefeça-a","Para aconselhamento não urgente: SNS 24, 808 24 24 24"]]]},
+ {id:"frio",t:"Frio e neve",s:"Tempo frio e gelo",ic:'<path d="M12 2v20M4 7l16 10M4 17L20 7"/>',lead:"O frio aumenta o risco de intoxicação por monóxido de carbono dentro de casa.",
+  sec:[["Em casa",["Nunca use braseiras, fogareiros ou geradores em espaços fechados","Mantenha ventilação quando usa aquecimentos a combustão"]],["Na estrada",["Com neve ou gelo evite deslocações; se sair, leve correntes, roupa quente, água e o depósito cheio"]]]},
+ {id:"abrigo",t:"Ficar abrigado em casa",s:"Acidente químico ou radiológico",ic:P.bunker,lead:"Em acidentes com nuvens tóxicas ou fugas de produtos perigosos, as autoridades podem pedir à população que fique dentro de casa.",key:"Entrar, ficar dentro, ouvir as notícias.",
+  sec:[["O que fazer",["Entre no edifício mais próximo e feche portas e janelas","Desligue ar condicionado, ventilação e extratores","Vá para uma divisão interior, com poucas ou nenhumas janelas","Se esteve no exterior, tire a roupa de fora e lave-se","Ouça a rádio ou a televisão e siga as indicações oficiais","Não vá buscar as crianças à escola: as escolas têm planos próprios","Só saia quando as autoridades indicarem"]]]},
+ {id:"apagao",t:"Apagão",s:"Falha geral de energia",ic:P.bolt,lead:"Um corte geral de eletricidade pode afetar comunicações, multibanco, semáforos e abastecimento de água em prédios.",
+  sec:[["Durante",["Desligue aparelhos sensíveis para evitar danos quando a luz voltar","Use lanternas, não velas","Abra o frigorífico e a arca o menos possível","Ouça um rádio a pilhas para ter notícias","Use o telemóvel com moderação para poupar bateria; mensagens de texto passam melhor do que chamadas"]],["Na estrada",["Cruzamentos com semáforos apagados: abrande e ceda a passagem com cuidado"]]]}
 ];
-const NUMS = [["Emergência (INEM, bombeiros, polícia)","112"],["SNS 24 — saúde","808 24 24 24"],["Centro de Informação Antivenenos","800 250 250"],["SOS Ambiente e Território (GNR)","808 200 520"]];
+const KIT=[["Água",["Água engarrafada para vários dias, para todas as pessoas da casa"]],["Comida",["Alimentos que não precisem de frio nem de cozinhar (enlatados, barras, frutos secos)","Abre-latas"]],["Luz e comunicação",["Rádio a pilhas ou de manivela","Lanterna","Pilhas de reserva","Powerbank carregado e cabos","Apito para pedir ajuda"]],["Saúde",["Estojo de primeiros socorros","Medicação habitual para vários dias e lista dos medicamentos","Insulina numa bolsa térmica, material da bomba/canetas, sensores, glucómetro e açúcar de absorção rápida (se aplicável)","Óculos de reserva","Máscaras e desinfetante"]],["Documentos e dinheiro",["Cópias dos documentos num saco impermeável","Lista em papel de contactos importantes","Algum dinheiro em notas e moedas"]],["Conforto",["Roupa quente e impermeável","Manta térmica","Artigos de higiene","Canivete multiusos","Comida e água para animais"]]];
+const NUMS=[["Emergência (INEM, bombeiros, polícia)","112"],["SNS 24 — saúde","808 24 24 24"],["Centro de Informação Antivenenos","800 250 250"],["SOS Ambiente e Território (GNR)","808 200 520"],["E-REDES — avarias","800 506 506"]];
 
-function renderGuides(){
-  $("#guideGrid").innerHTML = GUIDES.map(g=>`<button class="gbtn" data-g="${g.id}"><span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${IC[g.ic]}</svg></span><span style="min-width:0"><b>${esc(g.t)}</b><span>${esc(g.s)}</span></span></button>`).join("");
-  $("#guideGrid").querySelectorAll(".gbtn").forEach(b=>b.onclick=()=>openGuide(b.dataset.g));
-  $("#numsCard").innerHTML = NUMS.map(([n,v])=>`<span>${esc(n)}</span><b>${esc(v)}</b>`).join("");
+let page="home";
+function renderProfile(){
+  const v=$("#v-perfil");
+  if(page==="home"){
+    v.innerHTML=`<div class="ptitle"><h1>Perfil</h1></div>
+    <div class="gtitle">Preparar</div><div class="group">
+      ${item("guides",P.book,"Preparar","Guias e kit de emergência")}
+      ${item("shelters",P.bunker,"Abrigos e bunkers","Favoritos e acesso offline")}
+      ${item("nums",P.info,"Números úteis","112, SNS 24, Antivenenos…")}</div>
+    <div class="gtitle">Definições</div><div class="group">
+      ${item("nAlerts",P.bell,"Alertas de emergência","Notificações de perigos perto de si")}
+      ${item("nAct",P.fire,"Atividade de emergência","Notificações de ocorrências perto de si")}
+      ${item("breaking",P.bolt,"Última hora","Mostrar no painel")}
+      ${item("loc",P.pin,"Localização",esc(cfg.me.name))}
+      ${item("units",P.therm,"Unidades",cfg.temp==="F"?"Fahrenheit (°F)":"Celsius (°C)")}
+      ${item("adv",P.plug,"Avançado","Proxy e raio de pesquisa")}</div>
+    <div class="gtitle">Suporte</div><div class="group">
+      ${item("about",P.info,"Sobre e fontes","Gratuita, sem contas, sem publicidade")}</div>
+    <div class="gtitle">Zona de perigo</div><div class="group">
+      <button class="item danger" data-p="wipe"><span class="ii">${ic(P.trash)}</span><span class="it"><b>Apagar todos os dados offline</b><span>Favoritos, abrigos guardados, histórico e definições</span></span></button></div>
+    <div class="foot">Sentinela não é um serviço oficial. Em emergência ligue <b>112</b>.</div>`;
+  }
+  else if(page==="guides"){
+    const done=LS.get("kit",{}), extra=LS.get("kitx",[]); const total=KIT.reduce((s,x)=>s+x[1].length,0)+extra.length; const ok=Object.values(done).filter(Boolean).length;
+    v.innerHTML=hdr("Preparar")+`<div class="w"><div class="wh"><h2>Kit de emergência</h2><span class="small muted">${ok}/${total}</span></div><div class="prog"><i style="width:${total?Math.round(ok/total*100):0}%"></i></div><button class="btn y" data-p="kit">Abrir lista do kit</button></div>
+      <div class="gtitle">Guias</div><div class="group">`+GUIDES.map(g=>`<button class="item" data-g="${g.id}"><span class="ii">${ic(g.ic)}</span><span class="it"><b>${esc(g.t)}</b><span>${esc(g.s)}</span></span>${ic(P.chev,"i s muted")}</button>`).join("")+`</div>
+      <div class="foot">Orientações gerais baseadas nas recomendações públicas da ANEPC. Siga sempre as indicações das autoridades. <a href="https://prociv.gov.pt" target="_blank" rel="noopener">prociv.gov.pt</a></div>`;
+  }
+  else if(page==="kit"){
+    const done=LS.get("kit",{}), extra=LS.get("kitx",[]);
+    v.innerHTML=hdr("Kit de emergência","guides")+`<p class="muted" style="margin:0">Uma mochila pronta permite sair de casa em minutos ou aguentar alguns dias sem serviços. Reveja-a a cada 6 meses.</p>`+
+      KIT.map(([h,items],si)=>`<div class="w guide"><h4>${esc(h)}</h4><ul class="kit">`+items.map((t,ii)=>{ const id=si+"_"+ii; return `<li><input type="checkbox" id="k${id}" ${done[id]?"checked":""}><label for="k${id}">${esc(t)}</label></li>`; }).join("")+`</ul></div>`).join("")+
+      `<div class="w guide"><h4>Os meus itens</h4><ul class="kit">`+extra.map((t,i)=>`<li><input type="checkbox" id="kx${i}" ${done["x"+i]?"checked":""}><label for="kx${i}">${esc(t)}</label><button class="rm" data-rm="${i}" aria-label="Remover">${ic(P.trash,"i s")}</button></li>`).join("")+`</ul>
+      <div style="display:flex;gap:8px"><input class="inp" id="kitNew" placeholder="Adicionar o seu próprio item" maxlength="80"><button class="btn y" id="kitAdd">Adicionar</button></div></div>`;
+    v.querySelectorAll("input[type=checkbox]").forEach(c=>c.onchange=()=>{ const d=LS.get("kit",{}); d[c.id.slice(1)]=c.checked; LS.set("kit",d); });
+    v.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ const x=LS.get("kitx",[]); x.splice(+b.dataset.rm,1); LS.set("kitx",x); const d=LS.get("kit",{}); Object.keys(d).filter(k=>k.startsWith("x")).forEach(k=>delete d[k]); LS.set("kit",d); renderProfile(); });
+    $("#kitAdd").onclick=()=>{ const t=$("#kitNew").value.trim(); if(!t) return; const x=LS.get("kitx",[]); x.push(t); LS.set("kitx",x); renderProfile(); };
+  }
+  else if(page.startsWith("guide:")){
+    const g=GUIDES.find(x=>x.id===page.slice(6));
+    v.innerHTML=hdr(g.t,"guides")+`<div class="guide" style="display:flex;flex-direction:column;gap:14px"><p class="lead" style="margin:0">${esc(g.lead)}</p>${g.key?`<div class="key">${esc(g.key)}</div>`:""}`+
+      g.sec.map(([h,it])=>`<div class="w"><h4>${esc(h)}</h4><ul>`+it.map(x=>`<li>${esc(x)}</li>`).join("")+`</ul></div>`).join("")+`<div class="foot">Mais informação em <a href="https://prociv.gov.pt" target="_blank" rel="noopener">prociv.gov.pt</a>. Em emergência ligue 112.</div></div>`;
+  }
+  else if(page==="shelters"){
+    const bm=LS.get("bm",[]), off=LS.get("offSh",null); const h=here();
+    v.innerHTML=hdr("Abrigos e bunkers")+`<div class="gtitle">Favoritos</div><div class="group">`+(bm.length?bm.map(s=>`<button class="item" data-sh="${esc(s.id)}"><span class="ii" style="color:${SHCAT[s.cat][1]}">${ic(SHCAT[s.cat][2])}</span><span class="it"><b>${esc(s.name)}</b><span>${SHCAT[s.cat][0]} · ${fKm(km(h.lat,h.lon,s.lat,s.lon))}</span></span>${ic(P.chev,"i s muted")}</button>`).join("")
+      :`<div class="item" style="cursor:default"><span class="ii">${ic(P.star)}</span><span class="it"><b>Sem abrigos nos favoritos</b><span>Guarde abrigos no mapa para lhes aceder depressa</span></span></div>`)+`</div>
+      <div class="gtitle">Acesso offline</div><div class="group">
+        <button class="item" data-p="dlSh"><span class="ii">${ic(P.dl)}</span><span class="it"><b>Descarregar abrigos da zona</b><span>${off?`${off.items.length} guardados · ${esc(off.place)} · ${ago(off.t)}`:`Abrigos, bunkers, hospitais, bombeiros e polícia num raio de 25 km`}</span></span></button>
+        ${off?`<button class="item" data-p="seeOff"><span class="ii">${ic(P.pin)}</span><span class="it"><b>Ver abrigos offline</b><span>Lista ordenada por distância</span></span>${ic(P.chev,"i s muted")}</button>`:""}
+        ${off?`<button class="item danger" data-p="delOff"><span class="ii">${ic(P.trash)}</span><span class="it"><b>Apagar dados offline</b><span>Vai precisar de internet para os voltar a ver</span></span></button>`:""}</div>
+      <div class="foot">Portugal não tem uma lista pública oficial de abrigos. Estes pontos vêm do OpenStreetMap: abrigos, bunkers, pontos de encontro de emergência, hospitais, bombeiros e forças de segurança.</div>`;
+    v.querySelectorAll("[data-sh]").forEach(b=>b.onclick=()=>sheetShelter(bm.find(x=>x.id===b.dataset.sh)));
+  }
+  else if(page==="offlist"){
+    const off=LS.get("offSh",{items:[]}); const h=here(); const l=off.items.map(s=>({...s,d:km(h.lat,h.lon,s.lat,s.lon)})).sort((a,b)=>a.d-b.d);
+    v.innerHTML=hdr("Abrigos offline","shelters")+`<div class="group">`+l.slice(0,200).map(s=>`<button class="item" data-sh="${esc(s.id)}"><span class="ii" style="color:${SHCAT[s.cat][1]}">${ic(SHCAT[s.cat][2])}</span><span class="it"><b>${esc(s.name)}</b><span>${SHCAT[s.cat][0]}</span></span><span class="iv mono">${fKm(s.d)}</span></button>`).join("")+`</div>`;
+    v.querySelectorAll("[data-sh]").forEach(b=>b.onclick=()=>sheetShelter(l.find(x=>x.id===b.dataset.sh)));
+  }
+  else if(page==="nums"){
+    v.innerHTML=hdr("Números úteis")+`<div class="w nums">`+NUMS.map(([n,x])=>`<span>${esc(n)}</span><b>${esc(x)}</b>`).join("")+`</div>`;
+  }
+  else if(page==="nAlerts"){
+    const t=cfg.nTypes;
+    v.innerHTML=hdr("Alertas de emergência")+`<div class="group">${sw("nAlerts","Ativar notificações de alertas")}</div><div class="ffoot">Seja avisado de perigos perto de si. Com a app fechada, o Android pode atrasar ou suspender os avisos (limitação das apps web).</div>
+      <div class="group"><div class="item" style="cursor:default"><span class="it"><b>Avisar num raio de</b></span><select class="sel" id="nDist">${[10,25,50,100,200].map(x=>`<option value="${x}" ${cfg.nDist==x?"selected":""}>${x} km</option>`).join("")}</select></div>
+      <div class="item" style="cursor:default"><span class="it"><b>Gravidade mínima</b></span><select class="sel" id="nMinLvl"><option value="yellow">Moderado e acima (amarelo)</option><option value="orange">Grave e acima (laranja)</option><option value="red">Só extremo (vermelho)</option></select></div></div>
+      <div class="gtitle">Tipos de perigo</div><div class="group">${sw("t_meteo","Tempo severo",t.meteo)}${sw("t_incendio","Incêndios",t.incendio)}${sw("t_sismo","Sismos (M3+)",t.sismo)}${sw("t_ar","Qualidade do ar",t.ar)}${sw("t_luz","Falhas de energia",t.luz)}</div>
+      <div class="gtitle">Horas de silêncio</div><div class="group">${sw("quiet","Ativar horas de silêncio")}
+        <div class="item" style="cursor:default"><span class="it"><b>Das</b></span><input class="sel" type="time" id="qFrom" value="${cfg.qFrom}"></div>
+        <div class="item" style="cursor:default"><span class="it"><b>Às</b></span><input class="sel" type="time" id="qTo" value="${cfg.qTo}"></div></div>
+      <div class="ffoot">Os alertas menores ficam em pausa nestas horas. Os graves e extremos chegam sempre.</div>
+      <div class="gtitle">Cidades seguidas</div><div class="group">`+(cfg.cities.length?cfg.cities.map(c=>sw("city_"+c.id,c.name,c.notify!==false)).join(""):`<div class="item" style="cursor:default"><span class="it"><span>Ainda não segue nenhuma cidade</span></span></div>`)+`
+        <button class="item" id="addCity2"><span class="ii">${ic(P.plus)}</span><span class="it"><b>Seguir uma cidade</b></span></button></div>
+      <div class="ffoot">Ligue ou desligue os alertas de cada cidade que segue.</div>
+      <button class="btn o" id="testN">Testar notificação</button>`;
+    $("#nMinLvl").value=cfg.nMinLvl; $("#nDist").onchange=e=>{cfg.nDist=+e.target.value;save();}; $("#nMinLvl").onchange=e=>{cfg.nMinLvl=e.target.value;save();};
+    $("#qFrom").onchange=e=>{cfg.qFrom=e.target.value;save();}; $("#qTo").onchange=e=>{cfg.qTo=e.target.value;save();};
+    $("#addCity2").onclick=()=>openCityPicker(); $("#testN").onclick=async()=>{ if(await askNotif()) notify("Sentinela","As notificações estão a funcionar.","teste",true); };
+  }
+  else if(page==="nAct"){
+    v.innerHTML=hdr("Atividade de emergência")+`<div class="group">${sw("nAct","Ativar notificações de atividade")}<div class="item" style="cursor:default"><span class="it"><b>Avisar num raio de</b></span><select class="sel" id="nActR">${[2,5,10,25,50].map(x=>`<option value="${x}" ${cfg.nActR==x?"selected":""}>${x} km</option>`).join("")}</select></div></div>
+      <div class="ffoot">Seja avisado quando houver uma ocorrência da Proteção Civil perto de si. Usa as mesmas horas de silêncio dos alertas.</div>`;
+    $("#nActR").onchange=e=>{cfg.nActR=+e.target.value;save();};
+  }
+  else if(page==="breaking"){ v.innerHTML=hdr("Última hora")+`<div class="group">${sw("breakingDash","Mostrar no painel")}</div><div class="ffoot">Avisos laranja e vermelhos, ocorrências de grande dimensão e sismos sentidos, em todo o país.</div>`; }
+  else if(page==="loc"){
+    v.innerHTML=hdr("Localização")+`<div class="w"><div class="small muted">Atual: ${esc(cfg.me.name)} (${cfg.me.lat.toFixed(3)}, ${cfg.me.lon.toFixed(3)})${cfg.gps?" · GPS":""}</div><button class="btn y" id="gpsB">${ic(P.nav,"i s")}Usar a minha localização</button><input class="inp" id="locQ" placeholder="Ou pesquise uma localidade"><div id="locR"></div></div>
+      <div class="ffoot">A localização fica só neste telemóvel e é usada para pedir dados às fontes públicas.</div>`;
+    $("#gpsB").onclick=()=>useGPS(); placeSearch($("#locQ"),$("#locR"),x=>{ cfg.me={lat:x.latitude,lon:x.longitude,name:x.name}; cfg.gps=false; cfg.sel="me"; save(); toast("Localização: "+x.name); renderProfile(); refresh(); });
+  }
+  else if(page==="units"){ v.innerHTML=hdr("Unidades")+`<div class="group"><button class="item" data-u="C"><span class="it"><b>Celsius (°C)</b></span>${cfg.temp==="C"?ic(P.check,"i s"):""}</button><button class="item" data-u="F"><span class="it"><b>Fahrenheit (°F)</b></span>${cfg.temp==="F"?ic(P.check,"i s"):""}</button></div>`;
+    v.querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{ cfg.temp=b.dataset.u; save(); renderProfile(); renderWidgets(); }); }
+  else if(page==="adv"){
+    v.innerHTML=hdr("Avançado")+`<div class="group"><div class="item" style="cursor:default"><span class="it"><b>Raio do painel e do mapa</b></span><select class="sel" id="radS">${[10,25,50,100,200].map(x=>`<option value="${x}" ${cfg.radius==x?"selected":""}>${x} km</option>`).join("")}</select></div></div>
+      <div class="w"><b>Proxy (opcional)</b><input class="inp" id="proxyI" placeholder="https://o-seu-servidor/proxy?url=" value="${esc(cfg.proxy)}"><div class="small muted">Só é preciso se alguma fonte bloquear pedidos do browser. O endereço da fonte é acrescentado no fim.</div></div>`;
+    $("#radS").onchange=e=>{cfg.radius=+e.target.value;save();renderWidgets();drawMap();}; $("#proxyI").onchange=e=>{cfg.proxy=e.target.value.trim();save();LS.del("procivLayers");refresh();};
+  }
+  else if(page==="about"){
+    v.innerHTML=hdr("Sobre e fontes")+`<div class="w guide"><p class="lead" style="margin:0">A Sentinela é gratuita, sem contas e sem publicidade. Junta num só sítio os dados públicos de emergência para Portugal.</p><ul>
+      <li><b>Avisos meteorológicos, sismos e risco de incêndio:</b> IPMA</li><li><b>Ocorrências:</b> Proteção Civil (ANEPC), pelo portal prociv.gov.pt; em alternativa, fogos.pt</li>
+      <li><b>Falhas de energia:</b> dados abertos E-REDES</li><li><b>Outros serviços:</b> ligação ao Downdetector</li><li><b>Tempo e qualidade do ar:</b> Open-Meteo / CAMS</li>
+      <li><b>Radar:</b> RainViewer · <b>Satélite:</b> NASA GIBS · <b>Mapa e abrigos:</b> © OpenStreetMap, CARTO, Esri</li></ul>
+      <p class="small muted" style="margin:0">Não é um serviço oficial nem substitui os alertas por SMS da Proteção Civil. Em emergência ligue 112.</p></div>
+      <button class="btn o" id="reOnb">Ver introdução outra vez</button>`;
+    $("#reOnb").onclick=()=>onboarding(0);
+  }
+  v.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>profAction(b.dataset.p));
+  v.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>openGuide(b.dataset.g));
+  v.querySelectorAll("[data-back]").forEach(b=>b.onclick=()=>{ page=b.dataset.back; renderProfile(); window.scrollTo(0,0); });
+  v.querySelectorAll("input.sw").forEach(c=>c.onchange=()=>swChange(c));
 }
-function openGuide(id){
-  const g=GUIDES.find(x=>x.id===id); if(!g) return; const done=LS.get("kit",{});
-  const v=$("#guideView");
-  v.innerHTML = `<button class="back" id="gBack">‹ Guias</button><h1>${esc(g.t)}</h1><p class="lead">${esc(g.lead)}</p>${g.key?`<div class="key">${esc(g.key)}</div>`:""}`+
-    g.sec.map(([h,items],si)=>`<div class="card"><h4 style="margin-top:0">${esc(h)}</h4><ul class="${g.check?"check":""}">`+
-      items.map((it,ii)=> g.check ? `<li><input type="checkbox" id="k${si}_${ii}" ${done[si+"_"+ii]?"checked":""}><label for="k${si}_${ii}">${esc(it)}</label></li>` : `<li>${esc(it)}</li>`).join("")+`</ul></div>`).join("")+
-    (g.foot?`<p class="small muted">${esc(g.foot)}</p>`:"")+`<footer class="src">Orientações gerais. Siga sempre as indicações das autoridades. Mais em <a href="https://prociv.gov.pt" target="_blank" rel="noopener">prociv.gov.pt</a>.</footer>`;
-  if(g.check) v.querySelectorAll("input[type=checkbox]").forEach(c=>c.onchange=()=>{ const d=LS.get("kit",{}); d[c.id.slice(1)]=c.checked; LS.set("kit",d); });
-  $("#gBack").onclick=()=>{ v.hidden=true; $("#guideIndex").hidden=false; window.scrollTo(0,0); };
-  $("#guideIndex").hidden=true; v.hidden=false; window.scrollTo(0,0);
+const item=(p,i,t,s)=>`<button class="item" data-p="${p}"><span class="ii">${ic(i)}</span><span class="it"><b>${t}</b><span>${s}</span></span>${ic(P.chev,"i s muted")}</button>`;
+const hdr=(t,back="home")=>`<div class="ptitle"><button class="back" data-back="${back}" aria-label="Voltar">${ic(P.back)}</button><h1>${esc(t)}</h1></div>`;
+const sw=(id,label,val)=>`<label class="item" for="sw_${id}"><span class="it"><b>${esc(label)}</b></span><input type="checkbox" class="sw" id="sw_${id}" data-k="${id}" ${(val??cfg[id])?"checked":""}></label>`;
+async function swChange(c){ const k=c.dataset.k, v=c.checked;
+  if(k.startsWith("t_")) cfg.nTypes[k.slice(2)]=v; else if(k.startsWith("city_")){ const ct=cfg.cities.find(x=>x.id===k.slice(5)); if(ct) ct.notify=v; } else cfg[k]=v;
+  save(); if(v&&(k==="nAlerts"||k==="nAct")) await askNotif(); if(k==="breakingDash") renderWidgets(); }
+function openGuide(id){ page="guide:"+id; renderProfile(); window.scrollTo(0,0); }
+async function profAction(p){
+  if(p==="wipe"){ openSheet(`<h3>Apagar todos os dados?</h3><p>Isto apaga favoritos, abrigos offline, histórico, kit e definições deste telemóvel. Não dá para desfazer.</p><div class="row"><button class="btn" id="noW">Cancelar</button><button class="btn" style="background:#93000a;color:#ffdad6" id="yesW">Apagar</button></div>`);
+    $("#noW").onclick=closeSheet; $("#yesW").onclick=()=>{ LS.clear(); cfg=structuredClone(DEF); cfg.onboarded=true; save(); closeSheet(); toast("Dados apagados"); page="home"; renderProfile(); refresh(); }; return; }
+  if(p==="dlSh"){ const h=here(); toast("A descarregar abrigos…"); try{ const l=await loadShelters(h.lat,h.lon,25); LS.set("offSh",{t:Date.now(),place:h.name,items:l}); toast(`${l.length} abrigos descarregados`); }catch(e){ toast("Não foi possível descarregar. Tente mais tarde."); } renderProfile(); return; }
+  if(p==="seeOff"){ page="offlist"; renderProfile(); return; }
+  if(p==="delOff"){ LS.del("offSh"); toast("Dados offline apagados"); renderProfile(); return; }
+  page=p; renderProfile(); window.scrollTo(0,0);
 }
 
-/* ============ Definições ============ */
-function renderSettings(){
-  const sel=$("#distSel"); const auto=nearestArea(cfg.lat,cfg.lon);
-  sel.innerHTML = `<option value="">Automática (${esc(AREAS[auto][0])})</option>` + Object.entries(AREAS).map(([k,v])=>`<option value="${k}">${esc(v[0])}</option>`).join("");
-  sel.value = cfg.areaAuto ? "" : cfg.area;
-  $("#radSel").value = String(cfg.radius);
-  $("#nWarn").checked=cfg.nWarn; $("#nFire").checked=cfg.nFire; $("#nQuake").checked=cfg.nQuake; $("#minLvl").value=cfg.minLvl;
-  $("#proxyIn").value=cfg.proxy; $("#themeSel").value=cfg.theme;
-  $("#placeNow").textContent = `Atual: ${cfg.place} (${cfg.lat.toFixed(3)}, ${cfg.lon.toFixed(3)})`;
-  $("#notifState").textContent = !("Notification" in window) ? "Este browser não suporta notificações." : Notification.permission==="granted" ? "Permitidas" : Notification.permission==="denied" ? "Bloqueadas nas definições do telemóvel" : "";
+/* Personalizar painel */
+function openCustomize(){
+  const draw=()=>{ $("#sheet").innerHTML=`<div class="grab"></div><h3>Blocos do painel</h3><p class="small">Escolha o que aparece e por que ordem.</p><ul class="custom">`+
+    cfg.layout.map((w,i)=>`<li><input type="checkbox" class="sw" data-i="${i}" ${w.on?"checked":""} aria-label="Mostrar"><span style="flex:1">${esc((WIDGETS.find(x=>x[0]===w.id)||[0,w.id])[1])}</span><button class="mv" data-up="${i}" aria-label="Subir">${ic(P.up,"i s")}</button><button class="mv" data-dn="${i}" aria-label="Descer">${ic(P.down,"i s")}</button></li>`).join("")+
+    `</ul><div class="row"><button class="btn t" id="resetL">Repor disposição predefinida</button><button class="btn y" id="doneL" style="margin-left:auto">Concluído</button></div>`;
+    const sh=$("#sheet");
+    sh.querySelectorAll("[data-i]").forEach(c=>c.onchange=()=>{ cfg.layout[+c.dataset.i].on=c.checked; save(); renderWidgets(); });
+    sh.querySelectorAll("[data-up]").forEach(b=>b.onclick=()=>{ const i=+b.dataset.up; if(i>0){ [cfg.layout[i-1],cfg.layout[i]]=[cfg.layout[i],cfg.layout[i-1]]; save(); renderWidgets(); draw(); } });
+    sh.querySelectorAll("[data-dn]").forEach(b=>b.onclick=()=>{ const i=+b.dataset.dn; if(i<cfg.layout.length-1){ [cfg.layout[i+1],cfg.layout[i]]=[cfg.layout[i],cfg.layout[i+1]]; save(); renderWidgets(); draw(); } });
+    $("#resetL").onclick=()=>{ cfg.layout=structuredClone(DEF.layout); save(); renderWidgets(); draw(); }; $("#doneL").onclick=closeSheet; };
+  $("#sheetWrap").hidden=false; draw();
 }
-function setLoc(lat,lon,place){ cfg.lat=lat; cfg.lon=lon; cfg.place=place; saveCfg(); $("#locName").textContent=place; renderSettings(); refresh(true); if(map){ map.setView([lat,lon],9); drawMap(); } }
-$("#gpsBtn").onclick=()=>{
-  if(!navigator.geolocation){ toast("Este browser não dá acesso à localização."); return; }
-  toast("A obter localização…");
-  navigator.geolocation.getCurrentPosition(async p=>{
-    const lat=p.coords.latitude, lon=p.coords.longitude; let place=`${lat.toFixed(3)}, ${lon.toFixed(3)}`;
-    try{ const r=await getJSON(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&accept-language=pt`); const a=r.data.address||{}; place=a.city||a.town||a.village||a.municipality||a.county||place; }catch(e){}
-    cfg.areaAuto = true; setLoc(lat,lon,place);
-  }, e=>toast(e.code===1?"Acesso à localização recusado. Pesquise a localidade.":"Não foi possível obter a localização."), { enableHighAccuracy:false, timeout:15000, maximumAge:600000 });
-};
-let qT; $("#placeQ").oninput=e=>{ clearTimeout(qT); const q=e.target.value.trim(); if(q.length<2){ $("#placeRes").innerHTML=""; return; }
-  qT=setTimeout(async()=>{ try{ const r=await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=pt&format=json`);
-    const res=(r.data.results||[]); $("#placeRes").innerHTML = res.length ? res.map((x,i)=>`<button data-i="${i}"><b>${esc(x.name)}</b> <span class="muted small">${esc([x.admin2,x.admin1,x.country].filter(Boolean).join(", "))}</span></button>`).join("") : `<div class="small muted" style="padding:8px 0">Sem resultados.</div>`;
-    $("#placeRes").querySelectorAll("button").forEach(b=>b.onclick=()=>{ const x=res[+b.dataset.i]; $("#placeRes").innerHTML=""; $("#placeQ").value=""; setLoc(x.latitude,x.longitude,x.name); toast("Localização: "+x.name); });
-  }catch(err){ $("#placeRes").innerHTML=`<div class="err">A pesquisa falhou. Verifique a ligação.</div>`; } },350); };
-$("#distSel").onchange=e=>{ cfg.area=e.target.value; cfg.areaAuto=!e.target.value; saveCfg(); renderAll(); };
-$("#radSel").onchange=e=>{ cfg.radius=+e.target.value; saveCfg(); renderAll(); drawMap(); };
-["nWarn","nFire","nQuake"].forEach(id=>$("#"+id).onchange=async e=>{ cfg[id]=e.target.checked; saveCfg(); if(e.target.checked) await askNotif(); });
-$("#minLvl").onchange=e=>{ cfg.minLvl=e.target.value; saveCfg(); };
-$("#proxyIn").onchange=e=>{ cfg.proxy=e.target.value.trim(); saveCfg(); refresh(true); };
-$("#themeSel").onchange=e=>{ cfg.theme=e.target.value; saveCfg(); applyTheme(); };
-$("#clearBtn").onclick=()=>{ LS.clear(); cfg=Object.assign({},DEF); renderSettings(); toast("Dados apagados."); refresh(true); };
-$("#testNotif").onclick=async()=>{ if(await askNotif()) notify("Sentinela","As notificações estão a funcionar.","teste"); };
-$("#locBtn").onclick=()=>show("def");
-function applyTheme(){ if(cfg.theme) document.documentElement.setAttribute("data-theme",cfg.theme); else document.documentElement.removeAttribute("data-theme"); }
+$("#customBtn").onclick=openCustomize;
 
-/* ============ Notificações ============ */
-async function askNotif(){
-  if(!("Notification" in window)){ toast("Este browser não suporta notificações."); return false; }
-  if(Notification.permission==="granted") return true;
-  if(Notification.permission==="denied"){ toast("As notificações estão bloqueadas nas definições do telemóvel."); renderSettings(); return false; }
-  const p = await Notification.requestPermission(); renderSettings(); return p==="granted";
+/* Cidades seguidas e pesquisa de locais */
+function placeSearch(input,out,onPick){ let t; input.oninput=()=>{ clearTimeout(t); const q=input.value.trim(); if(q.length<2){ out.innerHTML=""; return; }
+  t=setTimeout(async()=>{ try{ const r=await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=pt&format=json`); const res=r.data.results||[];
+    out.innerHTML=res.length?`<div class="group" style="margin-top:8px">`+res.map((x,i)=>`<button class="item" data-i="${i}"><span class="ii">${ic(P.pin)}</span><span class="it"><b>${esc(x.name)}</b><span>${esc([x.admin2,x.admin1,x.country].filter(Boolean).join(", "))}</span></span></button>`).join("")+`</div>`:`<div class="empty">Sem resultados</div>`;
+    out.querySelectorAll("[data-i]").forEach(b=>b.onclick=()=>onPick(res[+b.dataset.i])); }catch(e){ out.innerHTML=`<div class="err">A pesquisa falhou. Verifique a ligação.</div>`; } },300); }; }
+function openCityPicker(){
+  openSheet(`<h3>Seguir uma cidade</h3><p class="small">Veja alertas e atividade de outro sítio, por exemplo onde vive a família ou onde trabalha.</p><input class="inp" id="cityQ" placeholder="Nome da localidade" autocomplete="off"><div id="cityR"></div>`);
+  setTimeout(()=>$("#cityQ").focus(),100);
+  placeSearch($("#cityQ"),$("#cityR"),x=>{ const id="c"+Math.round(x.latitude*1000)+"_"+Math.round(x.longitude*1000); if(!cfg.cities.find(c=>c.id===id)) cfg.cities.push({id,name:x.name,lat:x.latitude,lon:x.longitude,notify:true}); cfg.sel=id; save(); closeSheet(); toast("A seguir "+x.name); renderPlaces(); if(page==="nAlerts") renderProfile(); refresh(); });
 }
-async function notify(title, body, tag){
-  if(!("Notification" in window) || Notification.permission!=="granted") return;
-  try{ const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
-    if(reg) reg.showNotification(title,{ body, tag, icon:"icons/icon-192.png", badge:"icons/icon-192.png" }); else new Notification(title,{ body, tag }); }catch(e){}
-}
+function useGPS(after){
+  if(!navigator.geolocation){ toast("Este browser não dá acesso à localização."); after&&after(); return; }
+  navigator.geolocation.getCurrentPosition(async p=>{ const lat=p.coords.latitude,lon=p.coords.longitude; let name="A minha localização";
+    try{ const r=await getJSON(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&accept-language=pt`); const a=r.data.address||{}; name=a.city||a.town||a.village||a.municipality||a.county||name; }catch(e){}
+    cfg.me={lat,lon,name}; cfg.gps=true; cfg.sel="me"; save(); renderPlaces(); if(page==="loc") renderProfile(); refresh(); after&&after(); },
+    e=>{ toast(e.code===1?"Acesso à localização recusado. Pode escolher a localidade no Perfil.":"Não foi possível obter a localização."); after&&after(); },{timeout:15000,maximumAge:600000}); }
+
+/* ======================================================================
+   NOTIFICAÇÕES
+   ====================================================================== */
+async function askNotif(){ if(!("Notification" in window)){ toast("Este browser não suporta notificações."); return false; } if(Notification.permission==="granted") return true;
+  if(Notification.permission==="denied"){ toast("As notificações estão bloqueadas nas definições do telemóvel."); return false; } const p=await Notification.requestPermission(); renderWidgets(); return p==="granted"; }
+function inQuiet(){ if(!cfg.quiet) return false; const n=new Date(), m=n.getHours()*60+n.getMinutes(); const [a,b]=[cfg.qFrom,cfg.qTo].map(s=>{ const[h,mm]=s.split(":").map(Number); return h*60+mm; }); return a<b?(m>=a&&m<b):(m>=a||m<b); }
+async function notify(title,body,tag,critical){ if(!("Notification" in window)||Notification.permission!=="granted") return; if(!critical&&inQuiet()) return;
+  try{ const reg=navigator.serviceWorker&&await navigator.serviceWorker.getRegistration(); if(reg) reg.showNotification(title,{body,tag,icon:"icons/icon-192.png",badge:"icons/icon-192.png"}); else new Notification(title,{body,tag}); }catch(e){} }
 function checkNotify(){
-  const seen = new Set(LS.get("seen", [])); const first = !LS.get("seenInit", false); const add=[];
-  const a=myArea();
-  if(cfg.nWarn) S.warnings.filter(w=>w.area===a && LVL[w.lvl]>=LVL[cfg.minLvl]).forEach(w=>{ const k="w|"+w.area+"|"+w.type+"|"+w.lvl+"|"+w.start.toISOString();
-    if(!seen.has(k)){ add.push(k); if(!first) notify(`Aviso ${LVLNAME[w.lvl].toLowerCase()}: ${w.type}`, `${AREAS[a]?.[0]||a}, ${fmtDT(w.start)} → ${fmtDT(w.end)}`, k); } });
-  if(cfg.nFire) S.fires.forEach(f=>{ const d=km(cfg.lat,cfg.lon,f.lat,f.lon); const k="f|"+f.id; if(d<=cfg.radius && !seen.has(k)){ add.push(k); if(!first) notify(`${f.nat} a ${fmtKm(d)}`, `${f.loc} · ${f.status}`, k); } });
-  if(cfg.nQuake) S.quakes.forEach(q=>{ const d=km(cfg.lat,cfg.lon,q.lat,q.lon); const k="q|"+q.id; if(q.mag>=3 && d<=Math.max(cfg.radius,100) && Date.now()-q.time<864e5 && !seen.has(k)){ add.push(k); if(!first) notify(`Sismo M${num(q.mag,1)} a ${fmtKm(d)}`, `${q.region}, ${fmtDT(q.time)}`, k); } });
-  LS.set("seen", [...add, ...seen].slice(0,800)); LS.set("seenInit", true);
+  const seen=new Set(LS.get("seen",[])), first=!LS.get("seenInit",false), add=[];
+  const places=[{...cfg.me,name:cfg.me.name},...cfg.cities.filter(c=>c.notify!==false)];
+  if(cfg.nAlerts){
+    if(cfg.nTypes.meteo){ const areas=new Set(places.map(p=>nearestArea(p.lat,p.lon)));
+      S.warnings.filter(w=>areas.has(w.area)&&LVL[w.lvl]>=LVL[cfg.nMinLvl]).forEach(w=>{ const k="w|"+w.id; if(!seen.has(k)){ add.push(k); if(!first) notify(`Aviso ${LVN[w.lvl].toLowerCase()}: ${w.type}`,`${areaName(w.area)} · ${fDT(w.start)} → ${fDT(w.end)}`,k,LVL[w.lvl]>=2); } }); }
+    if(cfg.nTypes.incendio) S.act.filter(a=>a.kind==="fire").forEach(a=>{ const d=Math.min(...places.map(p=>km(p.lat,p.lon,a.lat,a.lon))); const k="f|"+a.id; if(d<=cfg.nDist&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} a ${fKm(d)}`,`${a.loc} · ${a.status}`,k,d<5); } });
+    if(cfg.nTypes.sismo) S.quakes.forEach(q=>{ const d=Math.min(...places.map(p=>km(p.lat,p.lon,q.lat,q.lon))); const k="q|"+q.id; if(q.mag>=3&&d<=Math.max(cfg.nDist,100)&&Date.now()-q.time<864e5&&!seen.has(k)){ add.push(k); if(!first) notify(`Sismo M${num(q.mag,1)} a ${fKm(d)}`,`${q.region}, ${fDT(q.time)}`,k,q.mag>=4.5); } });
+    if(cfg.nTypes.ar&&S.aq&&S.aq.current&&S.aq.current.european_aqi>60){ const k="ar|"+new Date().toDateString(); if(!seen.has(k)){ add.push(k); if(!first) notify("Qualidade do ar fraca",`Índice ${S.aq.current.european_aqi} em ${here().name}`,k,false); } }
+  }
+  if(cfg.nAct) S.act.forEach(a=>{ const d=km(cfg.me.lat,cfg.me.lon,a.lat,a.lon); const k="a|"+a.id; if(d<=cfg.nActR&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} perto de si (${fKm(d)})`,`${a.loc} · ${a.man} operacionais`,k,false); } });
+  LS.set("seen",[...add,...seen].slice(0,1500)); LS.set("seenInit",true);
 }
 
-/* ============ Ciclo principal ============ */
-function renderAll(){ renderStatus(); renderWx(); renderAq(); renderRcm(); renderFires(); renderQuakes(); renderWarnings(); drawMap(); }
+/* ======================================================================
+   INÍCIO GUIADO
+   ====================================================================== */
+const ART={
+  coast:`<svg viewBox="0 0 400 300"><defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f1729"/><stop offset="1" stop-color="#2a3a63"/></linearGradient><linearGradient id="bm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffeb3b" stop-opacity=".55"/><stop offset="1" stop-color="#ffeb3b" stop-opacity="0"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#sk)"/><g fill="#fff" opacity=".6"><circle cx="40" cy="40" r="1.2"/><circle cx="120" cy="25" r="1"/><circle cx="330" cy="50" r="1.3"/><circle cx="260" cy="20" r="1"/><circle cx="370" cy="110" r="1"/><circle cx="80" cy="95" r="1"/></g>
+    <path d="M232 112 L400 70 L400 150 Z" fill="url(#bm)"/><path d="M0 230 Q60 210 120 222 T240 214 L240 300 L0 300Z" fill="#1b2a4a"/>
+    <path d="M190 300 L190 210 Q215 185 250 190 L300 170 Q340 165 400 175 L400 300Z" fill="#0b1222"/><rect x="220" y="110" width="22" height="82" fill="#e6e1e5"/><rect x="220" y="128" width="22" height="9" fill="#c62828"/><rect x="220" y="155" width="22" height="9" fill="#c62828"/>
+    <path d="M216 110 h30 l-4 -12 h-22z" fill="#0b1222"/><rect x="225" y="100" width="12" height="9" fill="#ffeb3b"/><path d="M0 262 Q50 250 100 262 T200 262 T300 268 T400 262 L400 300 L0 300Z" fill="#22355e" opacity=".9"/></svg>`,
+  map:`<svg viewBox="0 0 400 300"><rect width="400" height="300" fill="#162036"/><g stroke="#2a3a63" stroke-width="2" fill="none"><path d="M0 80 Q120 60 200 100 T400 90"/><path d="M0 190 Q140 170 220 210 T400 200"/><path d="M90 0 L130 300"/><path d="M300 0 Q260 150 310 300"/></g>
+    <g fill="none" stroke="#ffeb3b"><circle cx="200" cy="150" r="40" opacity=".5"/><circle cx="200" cy="150" r="80" opacity=".25"/><circle cx="200" cy="150" r="120" opacity=".1"/></g>
+    <path d="M200 160 s-26-24-26-44a26 26 0 0 1 52 0c0 20-26 44-26 44z" fill="#ffeb3b"/><circle cx="200" cy="116" r="9" fill="#162036"/>
+    <g><path d="M300 92 s-10-9-10-17a10 10 0 0 1 20 0c0 8-10 17-10 17z" fill="#ff7043"/><path d="M110 210 s-10-9-10-17a10 10 0 0 1 20 0c0 8-10 17-10 17z" fill="#4fc3f7"/><path d="M290 225 s-10-9-10-17a10 10 0 0 1 20 0c0 8-10 17-10 17z" fill="#81c784"/></g></svg>`,
+  bell:`<svg viewBox="0 0 400 300"><rect width="400" height="300" fill="#162036"/><g fill="none" stroke="#ffeb3b" stroke-width="5" stroke-linecap="round" opacity=".7"><path d="M120 100 a90 90 0 0 0 0 100"/><path d="M95 80 a120 120 0 0 0 0 140" opacity=".5"/><path d="M280 100 a90 90 0 0 1 0 100"/><path d="M305 80 a120 120 0 0 1 0 140" opacity=".5"/></g>
+    <path d="M155 185 c10-12 10-30 10-48a35 35 0 0 1 70 0c0 18 0 36 10 48z" fill="#ffeb3b"/><rect x="148" y="183" width="104" height="12" rx="6" fill="#ffeb3b"/><circle cx="200" cy="208" r="12" fill="#ffeb3b"/><circle cx="200" cy="96" r="7" fill="#ffeb3b"/></svg>`
+};
+const ONB=[
+  {art:"coast",t:"Quando importa,\nesteja pronto",p:"Em catástrofes naturais ou emergências, a sua segurança está à distância de um passo, se tiver a informação certa."},
+  {art:"map",t:"Encontre os pontos\nseguros à sua volta",p:"Abrigos, bunkers, pontos de encontro, hospitais e bombeiros perto de si. A sua localização nunca sai do telemóvel.",cta:"loc"},
+  {art:"bell",t:"A Sentinela também\nvigia por si",p:"Os abrigos são só o começo. A Sentinela acompanha o que se passa à sua volta.",chips:["Alertas oficiais","Mapas de perigos ao vivo","Painel de locais"],cta:"notif"}
+];
+function onboarding(i){
+  const o=$("#onb"); o.hidden=false; const s=ONB[i];
+  o.innerHTML=`<button class="skip" id="oSkip">Saltar</button><div class="art">${ART[s.art]}</div>
+    <div class="dots">${ONB.map((_,j)=>`<i class="${j===i?"on":""}"></i>`).join("")}</div><h1>${esc(s.t)}</h1><p>${esc(s.p)}</p>
+    ${s.chips?`<div class="ochips">${s.chips.map(c=>`<span>${esc(c)}</span>`).join("")}</div>`:""}
+    ${s.cta==="loc"?`<button class="btn y full" id="oGo">Permitir acesso à localização</button><button class="btn t full" id="oNext">Talvez mais tarde</button>`
+      :s.cta==="notif"?`<button class="btn y full" id="oGo">Ativar notificações</button><button class="btn t full" id="oNext">Agora não</button>`
+      :`<button class="btn y full" id="oNext">Começar</button>`}`;
+  const next=()=>{ if(i<ONB.length-1) onboarding(i+1); else finishOnb(); };
+  $("#oSkip").onclick=finishOnb; $("#oNext").onclick=next;
+  if($("#oGo")) $("#oGo").onclick=async()=>{ if(s.cta==="loc") useGPS(next); else { await askNotif(); next(); } };
+}
+function finishOnb(){ cfg.onboarded=true; save(); $("#onb").hidden=true; }
+
+/* ======================================================================
+   CICLO PRINCIPAL E NAVEGAÇÃO
+   ====================================================================== */
 let busy=false;
 async function refresh(){
-  if(busy) return; busy=true; $("#refreshBtn").classList.add("spin");
-  const jobs = [
-    ["avisos", loadWarnings, ()=>{ renderStatus(); renderWarnings(); }, ()=>{ $("#statusCard .lvl").textContent="Sem dados"; $("#statusCard .big").textContent="Não foi possível ler os avisos do IPMA"; $("#statusSub").textContent="Verifique a ligação e toque em atualizar. Consulte ipma.pt."; }],
-    ["tempo", loadWx, renderWx, ()=>$("#wxCard").innerHTML='<h3>Tempo agora</h3><div class="err">Sem dados meteorológicos.</div>'],
-    ["ar", loadAq, renderAq, ()=>$("#aqCard").innerHTML='<h3>Qualidade do ar</h3><div class="err">Sem dados de qualidade do ar.</div>'],
-    ["risco", loadRcm, renderRcm, ()=>$("#rcmCard").innerHTML='<h3>Risco de incêndio rural</h3><div class="err">Não foi possível ler o risco de incêndio do IPMA.</div>'],
-    ["ocorrências", loadFires, renderFires, ()=>$("#fireCard").innerHTML='<h3>Ocorrências perto de si</h3><div class="err">Não foi possível ler as ocorrências (fogos.pt). Consulte prociv.gov.pt.</div>'],
-    ["sismos", loadQuakes, renderQuakes, ()=>$("#quakeCard").innerHTML='<h3>Sismos recentes</h3><div class="err">Não foi possível ler os sismos do IPMA.</div>']
-  ];
-  const fails=[];
-  await Promise.all(jobs.map(async ([n,load,ok,bad])=>{ try{ await load(); ok(); }catch(e){ console.warn(n,e); fails.push(n); bad(); } }));
-  drawMap(); checkNotify();
-  $("#lastUpd").innerHTML = `Atualizado às ${TF.format(new Date())}${fails.length?` · <span class="err">sem resposta: ${fails.join(", ")}</span>`:""}. Atualiza sozinho a cada 10 minutos com a app aberta.`;
+  if(busy) return; busy=true; $("#refreshBtn").classList.add("spin"); S.fails=[];
+  $("#offlineBanner").hidden=navigator.onLine!==false;
+  renderWidgets();
+  const jobs=[["alertas",loadWarnings],["ocorrências",loadActivity],["sismos",loadQuakes],["risco de incêndio",loadRcm],["tempo",loadWx],["qualidade do ar",loadAq],["energia",loadOutages]];
+  await Promise.all(jobs.map(async([n,f])=>{ try{ await f(); }catch(e){ console.warn(n,e); S.fails.push(n); } renderWidgets(); drawMap(); }));
+  S.lastAct=S.act.reduce((m,a)=>a.time&&a.time>m?a.time:m,null);
+  const off=LS.get("offSh"); if(off&&!S.shelters.length) S.shelters=off.items.slice();
+  renderWidgets(); drawMap(); if(map) legend(); checkNotify();
+  $("#lastUpd").innerHTML=`Atualizado às ${TF.format(new Date())}${S.fails.length?` · <span class="err">sem resposta: ${S.fails.join(", ")}</span>`:""}. Atualiza sozinho a cada 5 minutos.`;
   $("#refreshBtn").classList.remove("spin"); busy=false;
 }
 $("#refreshBtn").onclick=()=>refresh();
+$("#nbOn").onclick=async()=>{ await askNotif(); renderWidgets(); };
+$("#nbOff").onclick=()=>{ cfg.nbDismissed=true; save(); renderWidgets(); };
 
-/* Navegação por separadores (com #hash) */
-const VIEWS=["inicio","avisos","mapa","guias","def"];
-function show(v){ if(!VIEWS.includes(v)) v="inicio";
-  VIEWS.forEach(x=>$("#v-"+x).hidden = x!==v);
-  document.querySelectorAll("nav.tabs button").forEach(b=>{ if(b.dataset.v===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
+const VIEWS=["painel","mapa","perfil"];
+function go(v){ if(!VIEWS.includes(v)) v="painel";
+  VIEWS.forEach(x=>$("#v-"+x).hidden=x!==v);
+  document.querySelectorAll("nav.bar button").forEach(b=>{ if(b.dataset.v===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
   if(location.hash!=="#"+v) history.replaceState(null,"","#"+v);
-  if(v==="mapa"){ const h=document.querySelector("header.top").getBoundingClientRect().bottom; $("#map").style.top=h+"px"; setTimeout(initMap,30); }
-  if(v==="def") renderSettings();
-  window.scrollTo(0,0);
-}
-document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>show(b.dataset.v));
-window.addEventListener("hashchange",()=>show(location.hash.slice(1)));
+  if(v==="mapa") setTimeout(()=>{ initMap(); map.invalidateSize(); },30);
+  if(v==="perfil") renderProfile();
+  window.scrollTo(0,0); }
+document.querySelectorAll("nav.bar button").forEach(b=>b.onclick=()=>{ if(b.dataset.v==="perfil"&&$("#v-perfil").hidden===false){ page="home"; } go(b.dataset.v); });
+window.addEventListener("hashchange",()=>go(location.hash.slice(1)));
+window.addEventListener("online",()=>refresh()); window.addEventListener("offline",()=>$("#offlineBanner").hidden=false);
 
-/* Arranque */
-applyTheme();
-$("#locName").textContent = cfg.place;
-renderGuides(); renderSettings();
-show(location.hash.slice(1) || "inicio");
+renderPlaces();
+go(location.hash.slice(1)||"painel");
+if(!cfg.onboarded) onboarding(0);
 refresh();
-setInterval(()=>{ if(document.visibilityState==="visible" || cfg.nWarn || cfg.nFire || cfg.nQuake) refresh(); }, 10*60*1000);
-document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible" && Date.now()-(refresh._last||0)>5*60e3){ refresh._last=Date.now(); refresh(); } });
-if(!LS.get("cfg")) { saveCfg(); setTimeout(()=>$("#gpsBtn").click(), 600); }
-if("serviceWorker" in navigator && location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
+setInterval(()=>refresh(),5*60*1000);
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible"&&Date.now()-(refresh.l||0)>3*60e3){ refresh.l=Date.now(); refresh(); } });
+if("serviceWorker" in navigator&&location.protocol==="https:") navigator.serviceWorker.register("sw.js").catch(()=>{});
 </script>
 </body>
 </html>

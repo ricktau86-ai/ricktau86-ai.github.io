@@ -1,5 +1,5 @@
 /* Sentinela — service worker: guarda a app para abrir sem rede; os dados vêm sempre da rede (com cópia local na app) */
-const CACHE = "sentinela-v1";
+const CACHE = "sentinela-v2";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "vendor/leaflet.js", "vendor/leaflet.css", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -20,7 +20,7 @@ self.addEventListener("fetch", e => {
 self.addEventListener("notificationclick", e => {
   e.notification.close();
   e.waitUntil(self.clients.matchAll({ type: "window" }).then(cs => {
-    for (const c of cs) if ("focus" in c) { c.navigate && c.navigate("./#avisos"); return c.focus(); }
-    return self.clients.openWindow("./#avisos");
+    for (const c of cs) if ("focus" in c) { c.navigate && c.navigate("./#painel"); return c.focus(); }
+    return self.clients.openWindow("./#painel");
   }));
 });
