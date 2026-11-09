@@ -6,7 +6,7 @@ Endereço: https://ricktau86-ai.github.io/sentinela/
 
 ## Fontes
 - IPMA: avisos meteorológicos, sismos, risco de incêndio
-- Proteção Civil (ANEPC): ocorrências, lidas do portal ArcGIS que alimenta prociv.gov.pt/pt/ocorrencias (fogos.pt como alternativa)
+- Proteção Civil (ANEPC): ocorrências, lidas do portal ArcGIS que alimenta prociv.gov.pt/pt/ocorrencias (camada Ocorrencias_Base, lida diretamente pelo telemóvel)
 - E-REDES (dados abertos): falhas de energia
 - Downdetector: atalhos (não tem API gratuita)
 - Open-Meteo/CAMS: tempo e qualidade do ar · RainViewer: radar · NASA GIBS: satélite

@@ -146,6 +146,7 @@ a.btn{text-decoration:none}
 .mfab button{width:48px;height:48px;border-radius:16px;border:0;background:var(--s1);color:var(--fg);display:grid;place-items:center;box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;font-weight:700;font-size:12px}
 .mlegend{position:absolute;z-index:600;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(var(--nav) + env(safe-area-inset-bottom,0px) + 16px);background:rgba(30,30,30,.92);border-radius:12px;padding:6px 10px;font-size:12px;color:var(--fg2);max-width:60%}
 .leaflet-container{background:#0e0e0e;font-family:var(--font)}
+.osm-dark{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9) saturate(.6)}
 .leaflet-control-attribution{background:rgba(18,18,18,.7)!important;color:#888!important;font-size:10px!important}
 .leaflet-control-attribution a{color:#aaa!important}
 .leaflet-control-zoom{display:none}
@@ -381,57 +382,44 @@ async function loadWarnings(){
   LS.set("hist",h.filter(x=>new Date(x.end)>Date.now()-30*864e5).slice(0,400));
 }
 
-/* --- Ocorrências: Proteção Civil (ArcGIS do portal prociv.gov.pt) com fogos.pt como alternativa --- */
-const PROCIV_PORTAL="https://prociv-portal.geomai.mai.gov.pt/arcgis";
-const PROCIV_APP="29e83f11f7a34339b35364e483e3846f";
-async function procivLayers(){
-  const cached=LS.get("procivLayers"); if(cached&&Date.now()-cached.t<7*864e5&&cached.urls.length) return cached.urls;
-  const urls=new Set(), items=new Set();
-  const scan=o=>{ const s=JSON.stringify(o); (s.match(/https?:\\?\/\\?\/[^"\\]+?\/(?:FeatureServer|MapServer)\/\d+/g)||[]).forEach(u=>urls.add(u.replace(/\\\//g,"/")));
-    (s.match(/"itemId"\s*:\s*"([0-9a-f]{32})"/g)||[]).forEach(m=>items.add(m.match(/[0-9a-f]{32}/)[0])); };
-  const app=await getJSON(`${PROCIV_PORTAL}/sharing/rest/content/items/${PROCIV_APP}/data?f=json`); scan(app.data);
-  for(const id of [...items].slice(0,8)){
-    try{ const info=await getJSON(`${PROCIV_PORTAL}/sharing/rest/content/items/${id}?f=json`);
-      if(info.data&&info.data.url&&/FeatureServer|MapServer/.test(info.data.url)){ const u=info.data.url.replace(/\/$/,""); /\/\d+$/.test(u)?urls.add(u):urls.add(u+"/0"); }
-      const d=await getJSON(`${PROCIV_PORTAL}/sharing/rest/content/items/${id}/data?f=json`); scan(d.data);
-      (d.data&&d.data.operationalLayers||[]).forEach(l=>{ if(l.url){ const u=l.url.replace(/\/$/,""); urls.add(/\/\d+$/.test(u)?u:u+"/0"); } });
-    }catch(e){}
-  }
-  const list=[...urls]; if(list.length) LS.set("procivLayers",{t:Date.now(),urls:list}); return list;
-}
-function pick(o,re){ for(const k in o){ if(re.test(k)&&o[k]!=null&&o[k]!=="") return o[k]; } return null; }
-function toDate(v){ if(v==null) return null; if(typeof v==="number") return new Date(v>1e11?v:v*1000); const s=String(v); const m=s.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})[ T]?(\d{2}:\d{2})?/); if(m) return new Date(`${m[3]}-${m[2]}-${m[1]}T${m[4]||"00:00"}:00`); const d=new Date(s); return isNaN(d)?null:d; }
-async function loadProciv(){
-  const layers=await procivLayers(); if(!layers.length) throw new Error("sem camadas");
-  const out=[];
-  for(const u of layers.slice(0,6)){
-    try{
-      const r=await getJSON(`${u}/query?where=1%3D1&outFields=*&outSR=4326&returnGeometry=true&resultRecordCount=2000&f=json`);
-      for(const f of (r.data.features||[])){
-        const g=f.geometry||{}, a=f.attributes||{}; const lat=+(g.y??pick(a,/^lat/i)), lon=+(g.x??pick(a,/^lon|^lng/i)); if(!isFinite(lat)||!isFinite(lon)||!lat) continue;
-        out.push({ id:"pc"+(pick(a,/^(objectid|fid|id|numero|n_?ocorr)/i)??(lat+","+lon)), lat, lon,
-          nat:String(pick(a,/natureza|descri|tipo/i)||"Ocorrência"), status:String(pick(a,/estado|status|fase|situa/i)||""),
-          loc:[pick(a,/localidade|^local$|lugar/i),pick(a,/freguesia/i),pick(a,/concelho|municip/i)].filter(Boolean).join(", "),
-          district:String(pick(a,/distrito/i)||""), man:+pick(a,/operac|humanos|^man$|operacionais/i)||0, terrain:+pick(a,/terrest|veic/i)||0, aerial:+pick(a,/aere|aére/i)||0,
-          time:toDate(pick(a,/data|hora|inicio|date|dt/i)), important:/import|signific|relev/i.test(JSON.stringify(a)) && /sim|true|1/i.test(String(pick(a,/import|signific|relev/i))) });
-      }
-    }catch(e){}
-  }
-  if(!out.length) throw new Error("sem ocorrências");
-  return out;
-}
-async function loadFogos(){
-  const r=await getJSON("https://api.fogos.pt/v2/incidents/active",{key:"fogos"}); const arr=(r.data&&(r.data.data||r.data))||[];
-  return (Array.isArray(arr)?arr:[]).map(f=>{ let t=f.dateTime&&f.dateTime.sec?new Date(f.dateTime.sec*1000):null; if(!t&&f.date&&f.hour){ const[d,m,y]=String(f.date).split("-"); t=new Date(`${y}-${m}-${d}T${f.hour}:00`); }
-    return {id:"fg"+f.id,lat:+f.lat,lon:+(f.lng??f.lon),nat:f.natureza||"Ocorrência",status:f.status||"",loc:[f.localidade,f.freguesia,f.concelho].filter(Boolean).join(", ")||f.location||"",
-      district:f.district||"",man:+f.man||0,terrain:+f.terrain||0,aerial:+f.aerial||0,time:t,important:!!f.important}; }).filter(f=>isFinite(f.lat)&&isFinite(f.lon)&&f.lat);
-}
+/* --- Ocorrências: Proteção Civil — a mesma camada que o mapa de prociv.gov.pt/pt/ocorrencias usa (atualizada de 5 em 5 min) --- */
+const PROCIV_LAYER="https://prociv-agserver.geomai.mai.gov.pt/arcgis/rest/services/Ocorrencias_Base/FeatureServer/0";
+const nz=v=>v==null||v===""?null:v;
+function procivDate(a){ const v=nz(a.DataInicioOcorrencia)??nz(a.DataOcorrencia); if(typeof v==="number") return new Date(v);
+  if(a.Data){ const m=String(a.Data).match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/); if(m) return new Date(`${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}T${(a.Hora||"00:00").slice(0,5)}:00`); }
+  return v?toDate(v):null; }
+function toDate(v){ if(v==null) return null; if(typeof v==="number") return new Date(v>1e11?v:v*1000); const d=new Date(v); return isNaN(d)?null:d; }
 async function loadActivity(){
-  try{ S.act=await loadProciv(); S.actSrc="Proteção Civil (ANEPC)"; LS.set("c:act",{t:Date.now(),d:S.act,src:S.actSrc}); }
-  catch(e){ try{ S.act=await loadFogos(); S.actSrc="ANEPC via fogos.pt"; }
-    catch(e2){ const c=LS.get("c:act"); if(c){ S.act=c.d.map(x=>({...x,time:x.time?new Date(x.time):null})); S.actSrc=c.src+" (guardado)"; } else throw e2; } }
-  S.act.forEach(a=>a.kind=kindOf(a.nat));
+  const out=[]; let offset=0;
+  try{
+    for(let page=0;page<5;page++){
+      const r=await getJSON(`${PROCIV_LAYER}/query?where=1%3D1&outFields=*&outSR=4326&returnGeometry=true&resultOffset=${offset}&resultRecordCount=1000&f=json`);
+      if(r.data.error) throw new Error(r.data.error.message||"erro do servidor");
+      const feats=r.data.features||[];
+      for(const f of feats){ const a=f.attributes||{}, g=f.geometry||{};
+        let lat=+(g.y??a.Latitude), lon=+(g.x??a.Longitude); if(!isFinite(lat)||!isFinite(lon)||!lat) continue;
+        const terr=+(a.NumeroMeiosTerrestresEnvolvidos??pickN(a,/^NumeroMeiosTerrest/))||0, aer=+(a.NumeroMeiosAereosEnvolvidos??pickN(a,/^NumeroMeiosAereos/))||0;
+        out.push({ id:"pc"+(a.Numero??a.ID_oc??a.OBJECTID), num:a.Numero, lat, lon, nat:a.Natureza||a.Especie||"Ocorrência", fam:a.Familia||"", esp:a.Especie||"",
+          status:a.EstadoOcorrencia||a.EstadoAgrupado||"", grp:a.EstadoAgrupado||"", fase:a.FaseIncendio||"", imp:a.Importancia||"",
+          loc:[a.Localidade,a.Freguesia,a.Concelho].filter(Boolean).join(", "), concelho:a.Concelho||"", district:a.Distrito||"",
+          man:+(a.Operacionais??((+a.NumeroOperacionaisTerrestresEnv||0)+(+a.NumeroOperacionaisAereosEnvolvi||0)))||0, terrain:terr, aerial:aer,
+          rh:{Bombeiros:a.RHBombeiros,GNR:a.RHGNR,PSP:a.RHPSP,INEM:a.RHINEM,FEPC:a.RHFEPC,UEPS:a.RHUEPS,ICNF:a.RHESF,"Forças Armadas":a.RHFA,Outros:a.RHOutros},
+          time:procivDate(a), important:/signific|import|relev|grande/i.test(String(a.Importancia||"")) });
+      }
+      if(!r.data.exceededTransferLimit||!feats.length) break; offset+=feats.length;
+    }
+    S.act=out; S.actSrc="Proteção Civil (ANEPC)"; S.actErr=null;
+    LS.set("c:act",{t:Date.now(),d:out,src:S.actSrc});
+  }catch(e){
+    const c=LS.get("c:act"); S.actErr=e;
+    if(c){ S.act=c.d.map(x=>({...x,time:x.time?new Date(x.time):null})); S.actSrc=`Proteção Civil (ANEPC) · guardado ${ago(c.t)}`; }
+    else { S.act=[]; S.actSrc=""; throw e; }
+  }
+  S.act.forEach(a=>a.kind=kindOf(a.nat+" "+a.fam+" "+a.esp));
 }
+function pickN(o,re){ for(const k in o) if(re.test(k)&&o[k]!=null&&o[k]!=="") return o[k]; return null; }
+const pick=pickN;
+const GRPC={"Em Curso":"#ff7043","Em Resolução":"#64b5f6","Em Despacho":"#ffb74d","Em Conclusão":"#81c784"};
 function kindOf(n){ n=(n||"").toLowerCase();
   if(/inc[eê]nd|fogo|mato|povoamento|agr[ií]col|florest|queima|habitac|industr/.test(n)) return "fire";
   if(/acidente|rodovi|colis|despiste|atropel|ferrovi/.test(n)) return "car";
@@ -497,7 +485,7 @@ const WR={
     b+=`<div class="small muted">Fonte: IPMA</div>`; return b; },
   atividade(){ const h=here(); const R=cfg.radius; const list=S.act.map(x=>({...x,d:km(h.lat,h.lon,x.lat,x.lon)})).filter(x=>x.d<=R).sort((a,b)=>a.d-b.d);
     let b=`<div class="wh"><h2>Atividade de emergência</h2><button class="lnk" data-map="atividade">Ver mapa</button></div>`;
-    if(!S.act.length&&!S.actSrc) return b+`<div class="empty">A carregar ocorrências…</div>`;
+    if(!S.act.length&&!S.actSrc) return b+(S.fails.includes("ocorrências")?`<div class="err">Não foi possível ligar ao servidor da Proteção Civil. Tente atualizar daqui a pouco.</div><a class="small" href="https://prociv.gov.pt/pt/ocorrencias/" target="_blank" rel="noopener">Abrir ocorrências em prociv.gov.pt</a>`:`<div class="empty">A carregar ocorrências…</div>`);
     b+=`<div class="small muted">${list.length} num raio de ${R} km · ${S.act.length} ativas no país${S.lastAct?` · Última atividade ${ago(S.lastAct)}`:""}</div>`;
     b+=list.slice(0,5).map(actRow).join("")||`<div class="empty">Sem ocorrências ativas perto de si.</div>`;
     if(list.length>5) b+=`<button class="btn o full" data-map="atividade">Mais ${list.length-5} no mapa</button>`;
@@ -539,7 +527,7 @@ const WR={
 };
 const DD=[["MEO","meo","#00a3e0","M"],["NOS","nos","#1a1a1a","N"],["Vodafone","vodafone","#e60000","V"],["Facebook","facebook","#1877f2","F"],["WhatsApp","whatsapp","#25d366","W"],["Instagram","instagram","#c13584","I"],["Google","google","#4285f4","G"],["YouTube","youtube","#ff0000","Y"]];
 function actRow(x){ const k=KIND[x.kind]||KIND.alert; const urgent=x.important||x.man>=60||x.aerial>=2;
-  return `<button class="act" data-a="${esc(x.id)}"><span class="ai" style="--ac:${k[0]};--ac-bg:${k[1]}">${ic(k[2])}</span><span class="am"><span class="t">${esc(x.nat)}${urgent?` <span class="tag urg">Urgente</span>`:""}</span><span class="s">${esc(x.loc||x.district)}${x.status?" · "+esc(x.status):""}</span><span class="m">${x.man} operac. · ${x.terrain} terrestres · ${x.aerial} aéreos</span></span><span class="ar">${x.d!=null?fKm(x.d)+"<br>":""}${x.time?ago(x.time):""}</span></button>`; }
+  return `<button class="act" data-a="${esc(x.id)}"><span class="ai" style="--ac:${k[0]};--ac-bg:${k[1]}">${ic(k[2])}</span><span class="am"><span class="t">${esc(x.nat)}${urgent?` <span class="tag urg">Urgente</span>`:""}</span><span class="s">${esc(x.loc||x.district)}${x.status?` · <span style="color:${GRPC[x.grp]||"inherit"}">${esc(x.status)}</span>`:""}</span><span class="m">${x.man} operac. · ${x.terrain} terrestres · ${x.aerial} aéreos</span></span><span class="ar">${x.d!=null?fKm(x.d)+"<br>":""}${x.time?ago(x.time):""}</span></button>`; }
 
 const WMO={0:"Céu limpo",1:"Pouco nublado",2:"Parcialmente nublado",3:"Nublado",45:"Nevoeiro",48:"Nevoeiro",51:"Chuvisco fraco",53:"Chuvisco",55:"Chuvisco forte",61:"Chuva fraca",63:"Chuva",65:"Chuva forte",66:"Chuva gelada",67:"Chuva gelada",71:"Neve fraca",73:"Neve",75:"Neve forte",77:"Neve",80:"Aguaceiros fracos",81:"Aguaceiros",82:"Aguaceiros fortes",85:"Aguaceiros de neve",86:"Aguaceiros de neve",95:"Trovoada",96:"Trovoada com granizo",99:"Trovoada com granizo"};
 function wxIcon(c){ const sun='<circle cx="12" cy="12" r="4" stroke="#ffd54f"/><path stroke="#ffd54f" d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M5 19l1.4-1.4M17.6 6.4L19 5"/>';
@@ -590,8 +578,11 @@ document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeSheet(); });
 const dirUrl=(la,lo)=>`https://www.google.com/maps/dir/?api=1&destination=${la},${lo}`;
 async function shareIt(title,text,url){ try{ if(navigator.share){ await navigator.share({title,text,url}); return; } await navigator.clipboard.writeText(text+(url?" "+url:"")); toast("Copiado"); }catch(e){} }
 function sheetAct(x){ if(!x) return; const k=KIND[x.kind]||KIND.alert; const h=here(); const d=km(h.lat,h.lon,x.lat,x.lon);
-  openSheet(`<span class="tag" style="background:${k[1]};color:${k[0]}">${k[3]}</span><h3>${esc(x.nat)}</h3><div class="muted">${esc(x.loc||x.district)} · ${fKm(d)}</div>
-   <dl class="kv"><dt>Estado</dt><dd>${esc(x.status||"—")}</dd><dt>Início</dt><dd>${x.time?fDT(x.time)+" ("+ago(x.time)+")":"—"}</dd><dt>Operacionais</dt><dd>${x.man}</dd><dt>Meios terrestres</dt><dd>${x.terrain}</dd><dt>Meios aéreos</dt><dd>${x.aerial}</dd><dt>Distrito</dt><dd>${esc(x.district||"—")}</dd></dl>
+  const rh=x.rh?Object.entries(x.rh).filter(([,v])=>+v>0).map(([n,v])=>`${n} ${v}`).join(" · "):"";
+  openSheet(`<span class="tag" style="background:${k[1]};color:${k[0]}">${k[3]}</span> ${x.grp?`<span class="tag" style="background:${GRPC[x.grp]||"#555"};color:#121212">${esc(x.grp)}</span>`:""}<h3>${esc(x.nat)}</h3><div class="muted">${esc(x.loc||x.district)} · ${fKm(d)}</div>
+   <dl class="kv">${x.num?`<dt>N.º ocorrência</dt><dd class="mono">${esc(x.num)}</dd>`:""}<dt>Estado</dt><dd>${esc(x.status||"—")}</dd>${x.fase?`<dt>Fase</dt><dd>${esc(x.fase)}</dd>`:""}${x.imp?`<dt>Importância</dt><dd>${esc(x.imp)}</dd>`:""}
+   <dt>Início</dt><dd>${x.time?fDT(x.time)+" ("+ago(x.time)+")":"—"}</dd><dt>Operacionais</dt><dd>${x.man}</dd><dt>Meios terrestres</dt><dd>${x.terrain}</dd><dt>Meios aéreos</dt><dd>${x.aerial}</dd>
+   ${rh?`<dt>Entidades</dt><dd>${esc(rh)}</dd>`:""}<dt>Concelho</dt><dd>${esc(x.concelho||"—")}</dd><dt>Distrito</dt><dd>${esc(x.district||"—")}</dd></dl>
    <div class="row"><a class="btn y" href="${dirUrl(x.lat,x.lon)}" target="_blank" rel="noopener">${ic(P.nav,"i s")}Obter direções</a><button class="btn" id="shA">${ic(P.share,"i s")}Partilhar</button><a class="btn o" href="https://prociv.gov.pt/pt/ocorrencias/" target="_blank" rel="noopener">Ver fonte oficial</a></div>
    <p class="small muted">Fonte: ${esc(S.actSrc)}. Em emergência ligue 112.</p>`);
   $("#shA").onclick=()=>shareIt(x.nat,`${x.nat} — ${x.loc} (${x.status}). ${x.man} operacionais.`,""); }
@@ -627,13 +618,13 @@ function sheetHistory(){ const h=here(), a=nearestArea(h.lat,h.lon); const l=LS.
 let map, G={}, curMode="tudo", style="std", radarLayer, satLayer;
 const MODES=[["tudo","Tudo"],["alertas","Alertas"],["atividade","Atividade"],["abrigos","Abrigos"],["sismos","Sismos"],["ambiente","Ambiente"],["radar","Radar de chuva"],["satelite","Imagem de satélite"]];
 function baseLayer(s){
-  if(s==="sat") return L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"Imagens © Esri"});
-  return L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{maxZoom:19,subdomains:"abcd",attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>'});
+  if(s==="sat") return L.tileLayer("https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg",{maxZoom:19,maxNativeZoom:15,attribution:'<a href="https://s2maps.eu">Sentinel-2 cloudless</a> by EOX (dados Copernicus 2020)'});
+  return L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,className:"osm-dark",attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'});
 }
 let baseL, labelsL;
-function setStyle(s){ style=s; if(baseL) map.removeLayer(baseL); if(labelsL) map.removeLayer(labelsL);
+function setStyle(s){ style=s; if(baseL) map.removeLayer(baseL); if(labelsL){ map.removeLayer(labelsL); labelsL=null; }
   baseL=baseLayer(s==="std"?"std":"sat").addTo(map); baseL.bringToBack();
-  if(s==="hyb") labelsL=L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,pane:"overlayPane"}).addTo(map); }
+  if(s==="hyb"){ labelsL=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,opacity:.35,className:"osm-dark"}).addTo(map); } }
 function initMap(){
   if(map){ map.invalidateSize(); return; }
   const h=here(); map=L.map("map",{zoomControl:false,attributionControl:true,worldCopyJump:true}).setView([h.lat,h.lon],9);
@@ -833,7 +824,7 @@ function renderProfile(){
   }
   else if(page==="about"){
     v.innerHTML=hdr("Sobre e fontes")+`<div class="w guide"><p class="lead" style="margin:0">A Sentinela é gratuita, sem contas e sem publicidade. Junta num só sítio os dados públicos de emergência para Portugal.</p><ul>
-      <li><b>Avisos meteorológicos, sismos e risco de incêndio:</b> IPMA</li><li><b>Ocorrências:</b> Proteção Civil (ANEPC), pelo portal prociv.gov.pt; em alternativa, fogos.pt</li>
+      <li><b>Avisos meteorológicos, sismos e risco de incêndio:</b> IPMA</li><li><b>Ocorrências:</b> Proteção Civil (ANEPC), a mesma camada do mapa de prociv.gov.pt/pt/ocorrencias</li>
       <li><b>Falhas de energia:</b> dados abertos E-REDES</li><li><b>Outros serviços:</b> ligação ao Downdetector</li><li><b>Tempo e qualidade do ar:</b> Open-Meteo / CAMS</li>
       <li><b>Radar:</b> RainViewer · <b>Satélite:</b> NASA GIBS · <b>Mapa e abrigos:</b> © OpenStreetMap, CARTO, Esri</li></ul>
       <p class="small muted" style="margin:0">Não é um serviço oficial nem substitui os alertas por SMS da Proteção Civil. Em emergência ligue 112.</p></div>
