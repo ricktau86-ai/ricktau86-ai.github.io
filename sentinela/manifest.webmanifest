@@ -1,0 +1,17 @@
+{
+  "name": "Sentinela — Avisos e Emergência",
+  "short_name": "Sentinela",
+  "description": "Avisos do IPMA, ocorrências da Proteção Civil, sismos, risco de incêndio e guias de emergência para Portugal. Gratuito.",
+  "lang": "pt-PT",
+  "start_url": "./#inicio",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14213d",
+  "theme_color": "#14213d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
