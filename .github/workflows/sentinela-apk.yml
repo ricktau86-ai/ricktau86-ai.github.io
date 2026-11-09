@@ -2,7 +2,7 @@ name: Sentinela - APK Android
 on:
   push:
     branches: [main]
-    paths: ["sentinela/**", "sentinela-android/**", ".github/workflows/sentinela-apk.yml"]
+    paths: ["sentinela/**", "!sentinela/Sentinela.apk", "sentinela-android/**", ".github/workflows/sentinela-apk.yml"]
   workflow_dispatch:
 permissions:
   contents: write
@@ -61,3 +61,11 @@ jobs:
         run: |
           gh release delete sentinela-apk --yes --cleanup-tag || true
           gh release create sentinela-apk Sentinela.apk --target "${{ github.sha }}" --title "Sentinela para Android (versão 1.${{ github.run_number }})" --notes "APK da Sentinela. Descarregar Sentinela.apk e instalar (permitir instalar de fontes desconhecidas)."
+      - name: Pôr a APK no site (descarga direta)
+        working-directory: .
+        run: |
+          git pull -q origin main || true
+          cp sentinela-android/Sentinela.apk sentinela/Sentinela.apk
+          git add sentinela/Sentinela.apk
+          git -c user.name="sentinela-bot" -c user.email="sentinela-bot@users.noreply.github.com" commit -q -m "Sentinela: APK 1.${{ github.run_number }}" || exit 0
+          git push -q origin HEAD:main
