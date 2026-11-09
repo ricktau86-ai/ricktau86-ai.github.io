@@ -285,7 +285,7 @@ const DEF = {
   layout: WIDGETS.map(w=>({ id:w[0], on:true })),
   nAlerts:true, nMinLvl:"yellow", nTypes:{ meteo:true, incendio:true, sismo:true, ar:false, luz:false, dd:true }, nDist:50,
   quiet:false, qFrom:"23:00", qTo:"07:00", nAct:false, nActR:10, breakingDash:true,
-  radius:50, temp:"C", proxy:"", onboarded:false, nbDismissed:false
+  radius:50, temp:"C", showLong:false, proxy:"", onboarded:false, nbDismissed:false
 };
 let cfg = deepMerge(structuredClone(DEF), LS.get("cfg", {}));
 function deepMerge(a,b){ for(const k in b){ if(b[k] && typeof b[k]==="object" && !Array.isArray(b[k]) && a[k] && typeof a[k]==="object") deepMerge(a[k],b[k]); else a[k]=b[k]; } return a; }
@@ -418,14 +418,14 @@ async function loadActivity(){
     const out=[]; let upd=0;
     for(const f of (r.data.features||[])){ const a=f.attributes||{}, g=f.geometry||{};
       const lat=+(g.y??a.Latitude), lon=+(g.x??a.Longitude); if(!isFinite(lat)||!isFinite(lon)||!lat) continue;
-      const stale=(+a.DuracaoMinutos||0)>7*1440 && !(+a.Operacionais); // ocorrências administrativas abertas há semanas, sem meios
+      const longa=(+a.DuracaoMinutos||0)>3*1440; // abertas há mais de 3 dias (vigilâncias, operações de longa duração)
       if(a.DataDosDados>upd) upd=a.DataDosDados;
       out.push({ id:"pc"+(a.Numero||a.ID_oc), num:a.Numero, lat, lon, nat:String(a.Natureza||"Ocorrência").replace(/^\d+\s*-\s*/,""), cat:a.RASI||"",
         status:a.EstadoOcorrencia||a.EstadoAgrupado||"", grp:a.EstadoAgrupado||"", fase:a.FaseIncendio&&a.FaseIncendio!=="---"?a.FaseIncendio:"",
         loc:[a.Localidade,a.Freguesia,a.Concelho].filter(Boolean).join(", "), concelho:a.Concelho||"", district:[a.SubRegiao,a.Regiao].filter(Boolean).join(", "),
         addr:a.Endereco&&a.Endereco.trim()!=="---"?a.Endereco.trim():"", man:+a.Operacionais||0, terrain:+a.MeiosTerrestres||0, aerial:+a.MeiosAereos||0,
         opT:+a.OperacionaisTerrestres||0, opA:+a.OPAereos||0, ents:+a.QuantEntidades||0, dur:a.Duracao||"",
-        time:a.DataOcorrencia?new Date(a.DataOcorrencia):null, stale, important:(+a.Operacionais||0)>=60||(+a.MeiosAereos||0)>=2 });
+        time:a.DataOcorrencia?new Date(a.DataOcorrencia):null, longa, important:(+a.Operacionais||0)>=60||(+a.MeiosAereos||0)>=2 });
     }
     S.act=out; S.actSrc="Proteção Civil (ANEPC)"; S.actUpd=upd?new Date(upd):null;
     LS.set("c:act",{t:Date.now(),d:out,src:S.actSrc});
@@ -434,7 +434,7 @@ async function loadActivity(){
     if(c){ S.act=c.d.map(x=>({...x,time:x.time?new Date(x.time):null})); S.actSrc=`Proteção Civil (ANEPC) · guardado ${ago(c.t)}`; }
     else { S.act=[]; S.actSrc=""; throw e; }
   }
-  S.act.forEach(a=>a.kind=kindOf(a.nat+" "+a.cat));
+  S.act.forEach(a=>{ a.kind=kindOf(a.nat+" "+a.cat); if(a.longa==null&&a.time) a.longa=Date.now()-a.time>3*864e5; a.stale=a.longa&&!cfg.showLong; });
 }
 function pickN(o,re){ for(const k in o) if(re.test(k)&&o[k]!=null&&o[k]!=="") return o[k]; return null; }
 const pick=pickN;
@@ -505,7 +505,7 @@ const WR={
   atividade(){ const h=here(); const R=cfg.radius; const list=S.act.filter(x=>!x.stale).map(x=>({...x,d:km(h.lat,h.lon,x.lat,x.lon)})).filter(x=>x.d<=R).sort((a,b)=>a.d-b.d);
     let b=`<div class="wh"><h2>Atividade de emergência</h2><button class="lnk" data-map="atividade">Ver mapa</button></div>`;
     if(!S.act.length&&!S.actSrc) return b+(S.fails.includes("ocorrências")?`<div class="err">Não foi possível ligar ao servidor da Proteção Civil. Tente atualizar daqui a pouco.</div><a class="small" href="https://prociv.gov.pt/pt/ocorrencias/" target="_blank" rel="noopener">Abrir ocorrências em prociv.gov.pt</a>`:`<div class="empty">A carregar ocorrências…</div>`);
-    b+=`<div class="small muted">${list.length} num raio de ${R} km · ${S.act.filter(x=>!x.stale).length} ativas no país${S.actUpd?` · dados de ${TF.format(S.actUpd)}`:""}</div>`;
+    b+=`<div class="small muted">${list.length} num raio de ${R} km · ${S.act.filter(x=>!x.stale).length} ativas no país${S.actUpd?` · dados de ${TF.format(S.actUpd)}`:""}${S.act.some(x=>x.stale)?` · ${S.act.filter(x=>x.stale).length} de longa duração escondidas`:""}</div>`;
     b+=list.slice(0,5).map(actRow).join("")||`<div class="empty">Sem ocorrências ativas perto de si.</div>`;
     if(list.length>5) b+=`<button class="btn o full" data-map="atividade">Mais ${list.length-5} no mapa</button>`;
     return b+`<div class="small muted">Fonte: ${esc(S.actSrc)}</div>`; },
@@ -547,7 +547,7 @@ const WR={
 };
 const DD=[["MEO","meo","#00a3e0","M"],["NOS","nos","#1a1a1a","N"],["Vodafone","vodafone","#e60000","V"],["Facebook","facebook","#1877f2","F"],["WhatsApp","whatsapp","#25d366","W"],["Instagram","instagram","#c13584","I"],["Google","google","#4285f4","G"],["YouTube","youtube","#ff0000","Y"]];
 function actRow(x){ const k=KIND[x.kind]||KIND.alert; const urgent=x.important||x.man>=60||x.aerial>=2;
-  return `<button class="act" data-a="${esc(x.id)}"><span class="ai" style="--ac:${k[0]};--ac-bg:${k[1]}">${ic(k[2])}</span><span class="am"><span class="t">${esc(x.nat)}${urgent?` <span class="tag urg">Urgente</span>`:""}</span><span class="s">${esc(x.loc||x.district)}${x.status?` · <span style="color:${GRPC[x.grp]||"inherit"}">${esc(x.status)}</span>`:""}</span><span class="m">${x.man} operac. · ${x.terrain} terrestres · ${x.aerial} aéreos</span></span><span class="ar">${x.d!=null?fKm(x.d)+"<br>":""}${x.time?ago(x.time):""}</span></button>`; }
+  return `<button class="act" data-a="${esc(x.id)}"><span class="ai" style="--ac:${k[0]};--ac-bg:${k[1]}">${ic(k[2])}</span><span class="am"><span class="t">${esc(x.nat)}${urgent?` <span class="tag urg">Urgente</span>`:""}</span><span class="s">${esc(x.loc||x.district)}${x.status?` · <span style="color:${GRPC[x.grp]||"inherit"}">${esc(x.status)}</span>`:""}</span><span class="m">${x.man} operac. · ${x.terrain} terrestres · ${x.aerial} aéreos</span></span><span class="ar">${x.d!=null?fKm(x.d)+"<br>":""}${x.time?(Date.now()-x.time>864e5?"desde "+x.time.toLocaleDateString("pt-PT",{day:"numeric",month:"short"}):ago(x.time)):""}</span></button>`; }
 
 const WMO={0:"Céu limpo",1:"Pouco nublado",2:"Parcialmente nublado",3:"Nublado",45:"Nevoeiro",48:"Nevoeiro",51:"Chuvisco fraco",53:"Chuvisco",55:"Chuvisco forte",61:"Chuva fraca",63:"Chuva",65:"Chuva forte",66:"Chuva gelada",67:"Chuva gelada",71:"Neve fraca",73:"Neve",75:"Neve forte",77:"Neve",80:"Aguaceiros fracos",81:"Aguaceiros",82:"Aguaceiros fortes",85:"Aguaceiros de neve",86:"Aguaceiros de neve",95:"Trovoada",96:"Trovoada com granizo",99:"Trovoada com granizo"};
 function wxIcon(c){ const sun='<circle cx="12" cy="12" r="4" stroke="#ffd54f"/><path stroke="#ffd54f" d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M5 19l1.4-1.4M17.6 6.4L19 5"/>';
@@ -562,7 +562,7 @@ function rcmAt(h,d){ const r=S.rcm[d]; if(!r||!r.local) return null; let b=null,
 /* Última hora: alertas laranja/vermelhos, ocorrências importantes e sismos sentidos */
 function stories(){ const out=[]; const now=Date.now();
   S.warnings.filter(w=>LVL[w.lvl]>=2).forEach(w=>out.push({k:"w",ref:w.id,time:w.start>now?new Date():w.start,t:`Aviso ${LVN[w.lvl].toLowerCase()}: ${w.type.toLowerCase()} em ${areaName(w.area)}`,s:"IPMA",tags:`<span class="tag off">Oficial</span>`,c1:w.lvl==="red"?"#7f1d1d":"#7a3e00",c2:"#1e1e1e"}));
-  S.act.filter(a=>a.important||a.man>=60||a.aerial>=2).forEach(a=>out.push({k:"a",ref:a.id,time:a.time||new Date(),t:`${a.nat}${a.loc?" em "+a.loc.split(",").pop().trim():""}`,s:`${a.man} operacionais${a.aerial?` · ${a.aerial} meios aéreos`:""}`,tags:`<span class="tag live">Ao vivo</span>`,c1:"#5a1f0e",c2:"#1e1e1e"}));
+  S.act.filter(a=>!a.stale&&(a.important||a.man>=60||a.aerial>=2)).forEach(a=>out.push({k:"a",ref:a.id,time:a.time||new Date(),t:`${a.nat}${a.loc?" em "+a.loc.split(",").pop().trim():""}`,s:`${a.man} operacionais${a.aerial?` · ${a.aerial} meios aéreos`:""}`,tags:`<span class="tag live">Ao vivo</span>`,c1:"#5a1f0e",c2:"#1e1e1e"}));
   S.quakes.filter(q=>(q.felt||q.mag>=3.5)&&now-q.time<48*3600e3).forEach(q=>out.push({k:"q",ref:q.id,time:q.time,t:`Sismo de magnitude ${num(q.mag,1)} — ${q.region}`,s:q.felt?"Sentido pela população":"IPMA",tags:`<span class="tag off">Oficial</span>`,c1:"#3b1f6b",c2:"#1e1e1e"}));
   return out.sort((a,b)=>b.time-a.time); }
 
@@ -585,7 +585,7 @@ function drawMini(){
   const h=here(); miniMap=L.map("mini",{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false,boxZoom:false,keyboard:false}).setView([h.lat,h.lon],9);
   baseLayer("std").addTo(miniMap);
   L.circleMarker([h.lat,h.lon],{radius:7,color:"#121212",weight:2,fillColor:"#ffeb3b",fillOpacity:1}).addTo(miniMap);
-  S.act.forEach(a=>{ const k=KIND[a.kind]||KIND.alert; L.circleMarker([a.lat,a.lon],{radius:5,color:"#121212",weight:1,fillColor:k[0],fillOpacity:1}).addTo(miniMap); });
+  S.act.filter(a=>!a.stale).forEach(a=>{ const k=KIND[a.kind]||KIND.alert; L.circleMarker([a.lat,a.lon],{radius:5,color:"#121212",weight:1,fillColor:k[0],fillOpacity:1}).addTo(miniMap); });
 }
 
 /* ======================================================================
@@ -825,7 +825,7 @@ function renderProfile(){
     $("#addCity2").onclick=()=>openCityPicker(); $("#testN").onclick=async()=>{ if(await askNotif()) notify("Sentinela","As notificações estão a funcionar.","teste",true); };
   }
   else if(page==="nAct"){
-    v.innerHTML=hdr("Atividade de emergência")+`<div class="group">${sw("nAct","Ativar notificações de atividade")}<div class="item" style="cursor:default"><span class="it"><b>Avisar num raio de</b></span><select class="sel" id="nActR">${[2,5,10,25,50].map(x=>`<option value="${x}" ${cfg.nActR==x?"selected":""}>${x} km</option>`).join("")}</select></div></div>
+    v.innerHTML=hdr("Atividade de emergência")+`<div class="group">${sw("showLong","Mostrar ocorrências de longa duração")}</div><div class="ffoot">Ocorrências abertas há mais de 3 dias (vigilâncias, operações prolongadas). A Proteção Civil mantém algumas "Em Curso" durante meses.</div><div class="group">${sw("nAct","Ativar notificações de atividade")}<div class="item" style="cursor:default"><span class="it"><b>Avisar num raio de</b></span><select class="sel" id="nActR">${[2,5,10,25,50].map(x=>`<option value="${x}" ${cfg.nActR==x?"selected":""}>${x} km</option>`).join("")}</select></div></div>
       <div class="ffoot">Seja avisado quando houver uma ocorrência da Proteção Civil perto de si. Usa as mesmas horas de silêncio dos alertas.</div>`;
     $("#nActR").onchange=e=>{cfg.nActR=+e.target.value;save();};
   }
@@ -861,7 +861,7 @@ const hdr=(t,back="home")=>`<div class="ptitle"><button class="back" data-back="
 const sw=(id,label,val)=>`<label class="item" for="sw_${id}"><span class="it"><b>${esc(label)}</b></span><input type="checkbox" class="sw" id="sw_${id}" data-k="${id}" ${(val??cfg[id])?"checked":""}></label>`;
 async function swChange(c){ const k=c.dataset.k, v=c.checked;
   if(k.startsWith("t_")) cfg.nTypes[k.slice(2)]=v; else if(k.startsWith("city_")){ const ct=cfg.cities.find(x=>x.id===k.slice(5)); if(ct) ct.notify=v; } else cfg[k]=v;
-  save(); if(v&&(k==="nAlerts"||k==="nAct")) await askNotif(); if(k==="breakingDash") renderWidgets(); }
+  save(); if(v&&(k==="nAlerts"||k==="nAct")) await askNotif(); if(k==="breakingDash") renderWidgets(); if(k==="showLong"){ S.act.forEach(a=>a.stale=a.longa&&!cfg.showLong); renderWidgets(); drawMap(); } }
 function openGuide(id){ page="guide:"+id; renderProfile(); window.scrollTo(0,0); }
 async function profAction(p){
   if(p==="wipe"){ openSheet(`<h3>Apagar todos os dados?</h3><p>Isto apaga favoritos, abrigos offline, histórico, kit e definições deste telemóvel. Não dá para desfazer.</p><div class="row"><button class="btn" id="noW">Cancelar</button><button class="btn" style="background:#93000a;color:#ffdad6" id="yesW">Apagar</button></div>`);
@@ -923,12 +923,12 @@ function checkNotify(){
   if(cfg.nAlerts){
     if(cfg.nTypes.meteo){ const areas=new Set(places.map(p=>nearestArea(p.lat,p.lon)));
       S.warnings.filter(w=>areas.has(w.area)&&LVL[w.lvl]>=LVL[cfg.nMinLvl]).forEach(w=>{ const k="w|"+w.id; if(!seen.has(k)){ add.push(k); if(!first) notify(`Aviso ${LVN[w.lvl].toLowerCase()}: ${w.type}`,`${areaName(w.area)} · ${fDT(w.start)} → ${fDT(w.end)}`,k,LVL[w.lvl]>=2); } }); }
-    if(cfg.nTypes.incendio) S.act.filter(a=>a.kind==="fire").forEach(a=>{ const d=Math.min(...places.map(p=>km(p.lat,p.lon,a.lat,a.lon))); const k="f|"+a.id; if(d<=cfg.nDist&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} a ${fKm(d)}`,`${a.loc} · ${a.status}`,k,d<5); } });
+    if(cfg.nTypes.incendio) S.act.filter(a=>a.kind==="fire"&&!a.stale).forEach(a=>{ const d=Math.min(...places.map(p=>km(p.lat,p.lon,a.lat,a.lon))); const k="f|"+a.id; if(d<=cfg.nDist&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} a ${fKm(d)}`,`${a.loc} · ${a.status}`,k,d<5); } });
     if(cfg.nTypes.sismo) S.quakes.forEach(q=>{ const d=Math.min(...places.map(p=>km(p.lat,p.lon,q.lat,q.lon))); const k="q|"+q.id; if(q.mag>=3&&d<=Math.max(cfg.nDist,100)&&Date.now()-q.time<864e5&&!seen.has(k)){ add.push(k); if(!first) notify(`Sismo M${num(q.mag,1)} a ${fKm(d)}`,`${q.region}, ${fDT(q.time)}`,k,q.mag>=4.5); } });
     if(cfg.nTypes.dd&&S.dd&&!S.dd.fail){ const prev=S.dd.prev||{}; DD.forEach(([n,slug])=>{ const st=S.dd.res[slug]&&S.dd.res[slug].st; if((st==="bad"||st==="warn")&&prev[slug]!==st&&prev[slug]!=="bad"){ const k="dd|"+slug+"|"+st+"|"+new Date().toDateString(); if(!seen.has(k)){ add.push(k); if(!first) notify(`${n}: ${st==="bad"?"problemas":"possíveis problemas"}`,"Relatos de utilizadores no Downdetector",k,false); } } }); }
     if(cfg.nTypes.ar&&S.aq&&S.aq.current&&S.aq.current.european_aqi>60){ const k="ar|"+new Date().toDateString(); if(!seen.has(k)){ add.push(k); if(!first) notify("Qualidade do ar fraca",`Índice ${S.aq.current.european_aqi} em ${here().name}`,k,false); } }
   }
-  if(cfg.nAct) S.act.forEach(a=>{ const d=km(cfg.me.lat,cfg.me.lon,a.lat,a.lon); const k="a|"+a.id; if(d<=cfg.nActR&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} perto de si (${fKm(d)})`,`${a.loc} · ${a.man} operacionais`,k,false); } });
+  if(cfg.nAct) S.act.filter(a=>!a.stale).forEach(a=>{ const d=km(cfg.me.lat,cfg.me.lon,a.lat,a.lon); const k="a|"+a.id; if(d<=cfg.nActR&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} perto de si (${fKm(d)})`,`${a.loc} · ${a.man} operacionais`,k,false); } });
   LS.set("seen",[...add,...seen].slice(0,1500)); LS.set("seenInit",true);
 }
 
