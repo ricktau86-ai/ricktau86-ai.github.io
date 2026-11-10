@@ -36,9 +36,9 @@ svg.i.s{width:18px;height:18px}
 
 /* ---------- Estrutura ---------- */
 .screen{min-height:100%;padding:calc(env(safe-area-inset-top,0px) + 12px) max(16px,env(safe-area-inset-right,0px)) calc(var(--nav) + env(safe-area-inset-bottom,0px) + 24px) max(16px,env(safe-area-inset-left,0px));max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
-nav.bar{position:fixed;left:0;right:0;bottom:0;z-index:800;background:#1a1a1a;border-top:1px solid var(--line);height:calc(var(--nav) + env(safe-area-inset-bottom,0px));padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);display:grid;grid-template-columns:repeat(5,1fr)}
-nav.bar button{background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:500;cursor:pointer}
-nav.bar button .pillic{width:56px;height:32px;border-radius:16px;display:grid;place-items:center;transition:background .2s}
+nav.bar{position:fixed;left:0;right:0;bottom:0;z-index:800;background:#1a1a1a;border-top:1px solid var(--line);height:calc(var(--nav) + env(safe-area-inset-bottom,0px));padding:0 env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);display:grid;grid-template-columns:repeat(6,1fr)}
+nav.bar button{background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:500;cursor:pointer;min-width:0;white-space:nowrap}
+nav.bar button .pillic{width:48px;height:32px;border-radius:16px;display:grid;place-items:center;transition:background .2s}
 nav.bar button[aria-current="page"]{color:var(--fg)}
 nav.bar button[aria-current="page"] .pillic{background:var(--y-c);color:var(--y)}
 
@@ -253,12 +253,14 @@ input.inp{max-width:100%;width:100%}
 
 <!-- ================= PERFIL ================= -->
 <section id="v-perfil" class="screen" hidden></section>
+<section id="v-noticias" class="screen" hidden></section>
 <section id="v-estradas" class="screen" hidden></section>
 <section id="v-extra" class="screen" hidden></section>
 
 <nav class="bar" aria-label="Secções">
   <button data-v="painel" aria-current="page"><span class="pillic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg></span>Painel</button>
   <button data-v="mapa"><span class="pillic"><svg class="i" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg></span>Mapa</button>
+  <button data-v="noticias"><span class="pillic"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="15" height="16" rx="2"/><path d="M18 8h3v10a2 2 0 0 1-2 2"/><path d="M7 8h7M7 12h7M7 16h4"/></svg></span>Notícias</button>
   <button data-v="estradas"><span class="pillic"><svg class="i" viewBox="0 0 24 24"><path d="M5 21L9 3M19 21L15 3"/><path d="M12 5v2M12 11v2M12 17v2"/></svg></span>Estradas</button>
   <button data-v="extra"><span class="pillic"><svg class="i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg></span>Extra</button>
   <button data-v="perfil"><span class="pillic"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>Perfil</button>
@@ -270,6 +272,7 @@ input.inp{max-width:100%;width:100%}
 
 <script src="vendor/leaflet.js"></script>
 <script src="extra.js" defer></script>
+<script src="noticias.js" defer></script>
 <script>
 "use strict";
 /* ======================================================================
@@ -1016,7 +1019,7 @@ $("#refreshBtn").onclick=()=>refresh();
 $("#nbOn").onclick=async()=>{ await askNotif(); renderWidgets(); };
 $("#nbOff").onclick=()=>{ cfg.nbDismissed=true; save(); renderWidgets(); };
 
-const VIEWS=["painel","mapa","perfil","estradas","extra"];
+const VIEWS=["painel","mapa","perfil","estradas","extra","noticias"];
 function go(v){ if(!VIEWS.includes(v)) v="painel";
   VIEWS.forEach(x=>$("#v-"+x).hidden=x!==v);
   document.querySelectorAll("nav.bar button").forEach(b=>{ if(b.dataset.v===v) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current"); });
