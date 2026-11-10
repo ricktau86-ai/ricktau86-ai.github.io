@@ -278,12 +278,12 @@ const LS = {
 };
 const WIDGETS = [
   ["alertas","Alertas perto de si"],["atividade","Atividade de emergência"],["ultimahora","Última hora"],
-  ["minimapa","Mapa da zona"],["tempo","Tempo e previsão"],["ambiente","Ambiente"],["falhas","Falhas de serviços"],["sismos","Sismos"]
+  ["minimapa","Mapa da zona"],["tempo","Tempo e previsão"],["artigos","Artigos do tempo (LusoMeteo)"],["ambiente","Ambiente"],["falhas","Falhas de serviços"],["sismos","Sismos"]
 ];
 const DEF = {
-  me:{ lat:39.7436, lon:-8.8071, name:"Leiria" }, gps:false, cities:[], sel:"me",
+  me:{ lat:39.7436, lon:-8.8071, name:"Leiria", concelho:"Leiria" }, gps:false, cities:[], sel:"me",
   layout: WIDGETS.map(w=>({ id:w[0], on:true })),
-  nAlerts:true, nMinLvl:"yellow", nTypes:{ meteo:true, incendio:true, sismo:true, ar:false, luz:false, dd:true }, nDist:50,
+  nAlerts:true, nMinLvl:"yellow", nTypes:{ meteo:true, incendio:true, sismo:true, ar:false, luz:true }, nDist:50,
   quiet:false, qFrom:"23:00", qTo:"07:00", nAct:false, nActR:10, breakingDash:true,
   radius:50, temp:"C", showLong:false, proxy:"", onboarded:false, nbDismissed:false
 };
@@ -370,31 +370,6 @@ const IPMA="https://api.ipma.pt/open-data";
 /* Na app Android (Capacitor) os pedidos são nativos: não há bloqueios de CORS do browser */
 const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
 const LN=()=>NATIVE&&window.Capacitor.Plugins&&window.Capacitor.Plugins.LocalNotifications;
-/* Downdetector — consulta a página pública de cada serviço, só quando a app atualiza (sem API gratuita) */
-async function ddCheck(slug){
-  const ctrl=new AbortController(); const tm=setTimeout(()=>ctrl.abort(),15000);
-  try{
-    const r=await fetch(`https://downdetector.pt/problemas/${slug}/`,{signal:ctrl.signal,headers:{"Accept":"text/html","Accept-Language":"pt-PT,pt;q=0.9"}});
-    const html=await r.text();
-    if(/just a moment|cf-chl|challenge-platform|attention required/i.test(html)) return {st:"blk"};
-    const txt=html.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<[^>]+>/g," ").replace(/\s+/g," ");
-    const m=txt.match(/(relat[oó]rios[^.]{0,40}indicam[^.]{0,160})/i)||txt.match(/(user reports indicate[^.]{0,160})/i);
-    const sent=m?m[1].trim():"";
-    let st="unk";
-    if(/n[aã]o h[aá] problemas|sem problemas|no current problems/i.test(sent)) st="ok";
-    else if(/poss[ií]ve(l|is) problemas|possible problems/i.test(sent)) st="warn";
-    else if(/problemas|problems|falha|outage/i.test(sent)) st="bad";
-    else if(/alert-danger/.test(html)) st="bad"; else if(/alert-warning/.test(html)) st="warn"; else if(/alert-success/.test(html)) st="ok";
-    return {st, txt:sent};
-  }catch(e){ return {st:"err"}; } finally{ clearTimeout(tm); }
-}
-async function loadDD(){
-  if(!NATIVE) return; const prev=LS.get("dd",{}); const res={};
-  await Promise.all(DD.map(async([n,slug])=>{ res[slug]=await ddCheck(slug); }));
-  if(Object.values(res).every(x=>x.st==="err"||x.st==="blk")){ S.dd={res,t:Date.now(),fail:true}; throw new Error("Downdetector inacessível"); }
-  S.dd={res,t:Date.now(),prev}; LS.set("dd",Object.fromEntries(Object.entries(res).map(([k,v])=>[k,v.st])));
-}
-
 /* ======================================================================
    FONTES
    ====================================================================== */
@@ -457,19 +432,49 @@ async function loadQuakes(){
 }
 async function loadRcm(){ for(const d of [0,1]) S.rcm[d]=(await getJSON(IPMA+"/forecast/meteorology/rcm/rcm-d"+d+".json",{key:"rcm"+d,ttl:3*3600e3})).data; }
 async function loadWx(){ const h=here();
-  S.wx=(await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${h.lat}&longitude=${h.lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max&timezone=Europe%2FLisbon&forecast_days=7`,{key:"wx"})).data; }
+  const r=await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${h.lat}&longitude=${h.lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,relative_humidity_2m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_gusts_10m_max,uv_index_max,sunrise,sunset&hourly=temperature_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m&timezone=Europe%2FLisbon&forecast_days=14`,{key:"wx"}); S.wx=r.data; S.meta.wxT=r.t; }
+
+/* Sinais de tempo severo calculados a partir da previsão Open-Meteo (não são avisos oficiais) */
+function modelSignals(){ const w=S.wx; if(!w||!w.hourly) return []; const H=w.hourly, now=Date.now(), end=now+72*3600e3; const out=[];
+  const idx=H.time.map((t,i)=>[new Date(t).getTime(),i]).filter(([t])=>t>=now-3600e3&&t<=end).map(([,i])=>i);
+  const first=(cond)=>{ const i=idx.find(cond); return i==null?null:new Date(H.time[i]); };
+  const maxOf=a=>Math.max(...idx.map(i=>a[i]??0));
+  const g=maxOf(H.wind_gusts_10m), pr=maxOf(H.precipitation);
+  if(g>=60){ const lv=g>=100?"red":g>=80?"orange":"yellow"; out.push({lvl:lv,t:"Vento forte",d:`Rajadas até ${Math.round(g)} km/h`,when:first(i=>H.wind_gusts_10m[i]>=60)}); }
+  if(pr>=10){ const lv=pr>=30?"red":pr>=20?"orange":"yellow"; out.push({lvl:lv,t:"Chuva forte",d:`Até ${num(pr,1)} mm numa hora`,when:first(i=>H.precipitation[i]>=10)}); }
+  for(let k=0;k+24<=idx.length;k+=6){ const sum=idx.slice(k,k+24).reduce((a,i)=>a+(H.precipitation[i]||0),0); if(sum>=40){ out.push({lvl:sum>=80?"red":sum>=60?"orange":"yellow",t:"Muita chuva acumulada",d:`${Math.round(sum)} mm em 24 h`,when:new Date(H.time[idx[k]])}); break; } }
+  if(idx.some(i=>H.weather_code[i]>=95)) out.push({lvl:"yellow",t:"Trovoada",d:"Prevista nas próximas 72 h",when:first(i=>H.weather_code[i]>=95)});
+  if(idx.some(i=>H.weather_code[i]>=71&&H.weather_code[i]<=86&&!(H.weather_code[i]>=80&&H.weather_code[i]<=82))) out.push({lvl:"yellow",t:"Neve",d:"Prevista nas próximas 72 h",when:first(i=>H.weather_code[i]>=71&&H.weather_code[i]<=77)});
+  const tmax=maxOf(H.temperature_2m), tmin=Math.min(...idx.map(i=>H.temperature_2m[i]??99));
+  if(tmax>=35) out.push({lvl:tmax>=40?"red":tmax>=38?"orange":"yellow",t:"Calor",d:`Até ${T(tmax)}`,when:first(i=>H.temperature_2m[i]>=35)});
+  if(tmin<=0) out.push({lvl:tmin<=-5?"orange":"yellow",t:"Frio / geada",d:`Mínima de ${T(tmin)}`,when:first(i=>H.temperature_2m[i]<=0)});
+  return out.sort((a,b)=>LVL[b.lvl]-LVL[a.lvl]); }
+
+/* Artigos LusoMeteo (WordPress) — só título, data e categoria; o artigo abre no site */
+const LUSOCAT={6:"Análise climática",4:"Análise meteorológica",93:"Atualidade",28:"Destaque",7:"Didático",97:"Previsão curto prazo",3:"Longo prazo",2:"Previsão diária",5:"Previsão semanal"};
+async function loadLuso(){ const r=await getJSON("https://lusometeo.com/wp-json/wp/v2/posts?per_page=10&_embed=wp:featuredmedia&_fields=id,date,link,title,categories,_links,_embedded",{key:"luso"});
+  const dec=t=>{ const d=document.createElement("textarea"); d.innerHTML=t; return d.value; };
+  S.luso=(r.data||[]).map(p=>{ const m=p._embedded&&p._embedded["wp:featuredmedia"]&&p._embedded["wp:featuredmedia"][0]; const sz=m&&m.media_details&&m.media_details.sizes||{};
+    return {id:p.id,t:dec(p.title&&p.title.rendered||""),link:p.link,date:new Date(p.date),cat:LUSOCAT[(p.categories||[])[0]]||"",img:(sz.medium_large||sz.medium||sz.thumbnail||{}).source_url||(m&&m.source_url)||""}; }); }
 async function loadAq(){ const h=here(); S.aq=(await getJSON(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${h.lat}&longitude=${h.lon}&current=european_aqi,pm2_5,pm10&timezone=Europe%2FLisbon`,{key:"aq"})).data; }
 
-/* Falhas de energia — dados abertos E-REDES (Opendatasoft). Campos lidos de forma flexível. */
+/* Cortes de luz programados — dados abertos E-REDES (manutenção na rede de distribuição, atualizado diariamente) */
+const norm=t=>String(t||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim();
 async function loadOutages(){
-  const r=await getJSON("https://e-redes.opendatasoft.com/api/explore/v2.1/catalog/datasets/outages-per-geography/records?limit=100",{key:"out"});
-  const rows=r.data.results||[];
-  const items=rows.map(x=>({ where:String(pick(x,/concelho|municip/i)||pick(x,/zip|postal|cp|codigo/i)||pick(x,/distrito/i)||"—"),
-    district:String(pick(x,/distrito/i)||""), n:+(pick(x,/count|n_|num|total|outage|interrup|avaria/i))||1,
-    raw:x }));
-  S.outages={ items, t:r.t, stale:r.stale };
+  const h=here(); const conc=h.concelho||h.name; const now=Date.now();
+  const days=[...Array(8)].map((_,i)=>new Date(now+i*864e5).toISOString().slice(0,10));
+  const base="https://e-redes.opendatasoft.com/api/explore/v2.1/catalog/datasets/network-scheduling-work/records";
+  const mine=await getJSON(`${base}?where=${encodeURIComponent(`search(municipality,"${conc.replace(/"/g,"")}")`)}&order_by=startdatetime&limit=100`,{key:"cortes"});
+  const all=await getJSON(`${base}?where=${encodeURIComponent(`data in (${days.map(d=>`"${d}"`).join(",")})`)}&limit=0`,{key:"cortesN"});
+  const items=(mine.data.results||[]).filter(x=>norm(x.municipality)===norm(conc)).map(x=>({ cp:x.zipcode, mun:x.municipality, par:x.parish, start:new Date(x.startdatetime), end:new Date(x.enddatetime), upd:x.updatedatetime })).filter(x=>x.end>now);
+  const g={}; items.forEach(x=>{ const k=x.par+"|"+x.start.toISOString(); (g[k]=g[k]||{...x,cps:[]}).cps.push(x.cp); });
+  S.outages={ conc, items:Object.values(g).sort((a,b)=>a.start-b.start), nat:all.data.total_count||0, t:mine.t, stale:mine.stale };
 }
-
+/* Estado oficial do Google (Gmail, Drive, Meet, Calendar…) */
+async function loadGoogle(){
+  const r=await getJSON("https://www.google.com/appsstatus/dashboard/incidents.json",{key:"gws"});
+  S.gws=(Array.isArray(r.data)?r.data:[]).filter(i=>!i.end).map(i=>({ t:(i.external_desc||"").replace(/\*\*/g,"").split("\n").find(l=>l.trim()&&!/^summary/i.test(l))||"Incidente", prods:(i.affected_products||[]).map(p=>p.title).join(", "), sev:i.severity, begin:new Date(i.begin), uri:i.uri }));
+}
 /* Abrigos e pontos seguros — OpenStreetMap (Overpass) */
 const SHCAT={ shelter:["Abrigo","#ffeb3b",P.bunker], bunker:["Bunker","#ffeb3b",P.bunker], assembly:["Ponto de encontro","#81c784",P.people], hospital:["Hospital","#ef5350",P.hosp], fire:["Bombeiros","#ff7043",P.fire], police:["Polícia / GNR","#4fc3f7",P.police] };
 function shCat(t){ if(t.emergency==="assembly_point") return "assembly"; if(t.military==="bunker"||t.building==="bunker") return "bunker"; if(t.amenity==="hospital") return "hospital"; if(t.amenity==="fire_station") return "fire"; if(t.amenity==="police") return "police"; if(t.amenity==="shelter") return "shelter"; return null; }
@@ -515,29 +520,32 @@ const WR={
     return b; },
   minimapa(){ const h=here(); const nA=S.act.filter(x=>km(h.lat,h.lon,x.lat,x.lon)<=cfg.radius).length; const nW=S.warnings.filter(w=>w.area===nearestArea(h.lat,h.lon)).length;
     return `<div class="wh"><h2>Mapa da zona</h2><button class="lnk" data-map="tudo">Abrir mapa</button></div><div class="mini" data-map="tudo"><div class="mm" id="mini"></div><div class="cnts"><span>${nW} alertas</span><span>${nA} atividade</span><span>${S.shelters.length||"—"} abrigos</span></div></div>`; },
-  tempo(){ const w=S.wx; let b=`<div class="wh"><h2>Tempo</h2><span class="small muted">Open-Meteo</span></div>`; if(!w||!w.current) return b+`<div class="empty">A carregar…</div>`;
-    const c=w.current,d=w.daily;
-    b+=`<div class="wx"><span class="tmp">${T(c.temperature_2m)}</span><div><b>${esc(WMO[c.weather_code]||"")}</b><div class="small muted">Sensação ${T(c.apparent_temperature)} · Vento ${num(c.wind_speed_10m)} km/h, rajada ${num(c.wind_gusts_10m)}</div></div></div>`;
-    b+=`<div class="fc">`+d.time.map((t,i)=>`<div><span class="muted">${i?WDF.format(new Date(t)).replace(".",""):"Hoje"}</span>${wxIcon(d.weather_code[i])}<b>${T(d.temperature_2m_max[i])}</b><span class="muted">${T(d.temperature_2m_min[i])}</span><span style="color:var(--blue)">${d.precipitation_probability_max?num(d.precipitation_probability_max[i])+"%":""}</span></div>`).join("")+`</div>`;
+  tempo(){ const w=S.wx; let b=`<div class="wh"><h2>Tempo</h2><button class="lnk" data-wx>Previsão completa</button></div>`; if(!w||!w.current) return b+`<div class="empty">A carregar…</div>`;
+    const c=w.current,d=w.daily; const sig=modelSignals();
+    b+=`<div class="wx" data-wx style="cursor:pointer"><span class="tmp">${T(c.temperature_2m)}</span><div><b>${esc(WMO[c.weather_code]||"")}</b><div class="small muted">Sensação ${T(c.apparent_temperature)} · Vento ${num(c.wind_speed_10m)} km/h, rajada ${num(c.wind_gusts_10m)}</div></div></div>`;
+    if(sig.length) b+=`<div style="display:flex;flex-direction:column;gap:6px">`+sig.slice(0,3).map(x=>`<div class="alert" data-wx style="--lc:${LVC[x.lvl]};padding:9px 12px"><span class="lv"></span><span style="flex:1;min-width:0"><span class="at">${esc(x.t)}</span> <span class="as">· ${esc(x.d)}${x.when?` · ${fDT(x.when)}`:""}</span></span></div>`).join("")+`<div class="small muted">Sinais calculados pela previsão Open-Meteo para este local. Não são avisos oficiais; os oficiais estão em "Alertas perto de si".</div></div>`;
+    b+=`<div class="fc" data-wx style="cursor:pointer">`+d.time.slice(0,7).map((t,i)=>`<div><span class="muted">${i?WDF.format(new Date(t)).replace(".",""):"Hoje"}</span>${wxIcon(d.weather_code[i])}<b>${T(d.temperature_2m_max[i])}</b><span class="muted">${T(d.temperature_2m_min[i])}</span><span style="color:var(--blue)">${d.precipitation_probability_max?num(d.precipitation_probability_max[i])+"%":""}</span></div>`).join("")+`</div>`;
     return b; },
+  artigos(){ let b=`<div class="wh"><h2>Artigos do tempo</h2><a class="lnk" href="https://lusometeo.com/" target="_blank" rel="noopener" style="text-decoration:none">LusoMeteo</a></div>`;
+    if(!S.luso) return b+(S.fails.includes("artigos")?`<div class="empty">Não foi possível ler os artigos agora. <a href="https://lusometeo.com/" target="_blank" rel="noopener">Abrir LusoMeteo</a></div>`:`<div class="empty">A carregar…</div>`);
+    return b+`<div class="stories">`+S.luso.slice(0,8).map(a=>`<a class="story" href="${esc(a.link)}" target="_blank" rel="noopener" style="text-decoration:none;--st1:#1d2a44;--st2:#1e1e1e;${a.img?`background:linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.85)),url('${esc(a.img)}') center/cover`:""}"><span>${a.cat?`<span class="tag g">${esc(a.cat)}</span>`:""}</span><span class="st-t">${esc(a.t)}</span><span class="st-s">LusoMeteo · ${ago(a.date)}</span></a>`).join("")+`</div><div class="small muted">Artigos de análise e previsão do LusoMeteo. Toque para ler no site.</div>`; },
   ambiente(){ const h=here(); const aq=S.aq&&S.aq.current; const t=rcmAt(h,0), m=rcmAt(h,1); const uv=S.wx&&S.wx.daily&&S.wx.daily.uv_index_max?S.wx.daily.uv_index_max[0]:null; const [ab,ac]=aqBand(aq&&aq.european_aqi);
     return `<div class="wh"><h2>Ambiente</h2></div><div class="env">
       <div><span class="k">Qualidade do ar</span><span class="v">${num(aq&&aq.european_aqi)}</span><span class="q" style="--qc:${ac}">${ab}</span></div>
       <div><span class="k">Risco incêndio hoje</span><span class="v" style="color:${t?RCMC[t.v]:"inherit"}">${t?t.v+"/5":"—"}</span><span class="q" style="--qc:var(--fg2)">${t?RCMN[t.v]:""}${m?` · amanhã ${m.v}/5`:""}</span></div>
       <div><span class="k">Índice UV máx.</span><span class="v">${num(uv,0)}</span><span class="q" style="--qc:${uv>=8?"#ff5449":uv>=6?"#ff9800":uv>=3?"#ffd54f":"#4caf50"}">${uv==null?"":uv>=8?"Muito elevado":uv>=6?"Elevado":uv>=3?"Moderado":"Baixo"}</span></div></div>
       <div class="small muted">Fontes: CAMS/Open-Meteo, IPMA</div>`; },
-  falhas(){ const o=S.outages; const h=here();
-    let b=`<div class="wh"><h2>Falhas de serviços</h2></div>`;
-    b+=`<div class="small" style="font-weight:600">Energia — E-REDES</div>`;
-    if(!o) b+=`<div class="empty">${S.fails.includes("energia")?`<span class="err">Sem dados da E-REDES agora.</span>`:"A carregar…"}</div>`;
-    else { const tot=o.items.reduce((s,x)=>s+x.n,0); const top=o.items.slice().sort((a,b)=>b.n-a.n).slice(0,4);
-      b+= tot?`<div class="small muted">${tot} interrupção(ões) ativa(s) registada(s)${o.stale?" (guardado)":""}</div>`+top.map(x=>`<div class="act" style="cursor:default">${`<span class="ai" style="--ac:#ffb74d;--ac-bg:#3b2a12">${ic(P.bolt)}</span>`}<span class="am"><span class="t">${esc(x.where)}</span><span class="s">${esc(x.district)}</span></span><span class="ar">${x.n}</span></div>`).join("")
-        :`<div class="clear"><div class="ok">${ic(P.check)}</div><div><b>Sem falhas de energia registadas</b></div></div>`; }
-    b+=`<a class="small" href="https://www.e-redes.pt/pt-pt/avarias-e-emergencias" target="_blank" rel="noopener">Comunicar avaria ou consultar a sua morada na E-REDES</a>`;
-    b+=`<div class="small" style="font-weight:600;margin-top:4px">Outros serviços — Downdetector</div><div class="svc">`+
-      DD.map(([n,s,c,l])=>{ const r=S.dd&&S.dd.res[s]; const st=r?r.st:null; const lab={ok:["Sem problemas","#81c784"],warn:["Possíveis problemas","#ffd54f"],bad:["Problemas","#ff5449"],unk:["Ver","#938f99"],blk:["Ver","#938f99"],err:["Ver","#938f99"]}[st]||null;
-        return `<a href="https://downdetector.pt/problemas/${s}/" target="_blank" rel="noopener" ${st==="bad"?'style="outline:2px solid #ff5449"':st==="warn"?'style="outline:2px solid #ffd54f"':""}><i style="--sc:${c}">${l}</i>${n}${lab?`<span style="font-size:11px;color:${lab[1]}">${lab[0]}</span>`:""}</a>`; }).join("")+`</div>
-      <div class="small muted">${NATIVE?(S.dd?(S.dd.fail?"O Downdetector não respondeu agora; toque num serviço para abrir a página.":`Relatos de utilizadores no Downdetector, verificado ${ago(S.dd.t)}. Toque para ver o gráfico.`):"A verificar o Downdetector…"):"Na app Android, o estado de cada serviço aparece aqui. No browser, toque para abrir o Downdetector."} <a href="https://downdetector.pt/" target="_blank" rel="noopener">Ver todos</a></div>`;
+  falhas(){ const o=S.outages;
+    let b=`<div class="wh"><h2>Falhas de serviços</h2></div><div class="small" style="font-weight:600">Cortes de luz programados — E-REDES</div>`;
+    if(!o) b+=`<div class="empty">${S.fails.includes("cortes de luz")?`<span class="err">Sem resposta da E-REDES agora.</span>`:"A carregar…"}</div>`;
+    else { b+= o.items.length? o.items.slice(0,5).map(x=>`<div class="act" style="cursor:default"><span class="ai" style="--ac:#ffb74d;--ac-bg:#3b2a12">${ic(P.bolt)}</span><span class="am"><span class="t">${esc(x.par)}</span><span class="s">${esc(x.mun)} · CP ${esc(x.cps.slice(0,3).join(", "))}${x.cps.length>3?` +${x.cps.length-3}`:""}</span><span class="m">${fDT(x.start)} → ${TF.format(x.end)}</span></span></div>`).join("")+(o.items.length>5?`<div class="small muted">Mais ${o.items.length-5} cortes previstos em ${esc(o.conc)}.</div>`:"")
+        :`<div class="clear"><div class="ok">${ic(P.check)}</div><div><b>Sem cortes programados em ${esc(o.conc)}</b><span class="small muted">${o.nat} no país nos próximos 7 dias</span></div></div>`;
+      b+=`<div class="small muted">Manutenção planeada da rede. Avarias não planeadas: ligue 800 506 506 ou veja a sua morada no <a href="https://balcaodigital.e-redes.pt/" target="_blank" rel="noopener">Balcão Digital E-REDES</a>.</div>`; }
+    b+=`<div class="small" style="font-weight:600;margin-top:4px">Google — estado oficial</div>`;
+    b+= !S.gws?`<div class="empty">${S.fails.includes("Google")?"Sem resposta.":"A carregar…"}</div>`: S.gws.length? S.gws.slice(0,3).map(i=>`<a class="act" href="https://www.google.com/appsstatus/dashboard/${esc(i.uri||"")}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="ai" style="--ac:#ffd54f;--ac-bg:#3b3410">${ic(P.alert)}</span><span class="am"><span class="t">${esc(i.prods||"Google Workspace")}</span><span class="s">${esc(i.t)}</span><span class="m">desde ${fDT(i.begin)}</span></span></a>`).join("") : `<div class="clear"><div class="ok">${ic(P.check)}</div><div><b>Gmail, Drive, Meet e Calendar sem incidentes</b></div></div>`;
+    b+=`<div class="small" style="font-weight:600;margin-top:4px">Operadoras e apps — Downdetector</div><div class="svc">`+
+      DD.map(([n,s,c,l])=>`<a href="https://downdetector.pt/problemas/${s}/" target="_blank" rel="noopener"><i style="--sc:${c}">${l}</i>${n}</a>`).join("")+`</div>
+      <div class="small muted">Abre no browser a página do Downdetector com as queixas em tempo real. O Downdetector bloqueia a leitura automática, por isso o estado não aparece aqui.</div>`;
     return b; },
   sismos(){ const h=here(); const R=Math.max(cfg.radius,100); const wk=Date.now()-7*864e5; const l=S.quakes.map(q=>({...q,d:km(h.lat,h.lon,q.lat,q.lon)}));
     const near=l.filter(q=>q.d<=R&&q.time>=wk), felt=l.filter(q=>q.felt&&q.time>=wk); const show=(near.length?near:felt).slice(0,4);
@@ -577,6 +585,7 @@ function renderWidgets(){
   box.querySelectorAll("[data-st]").forEach(e=>e.onclick=()=>openStory(stories()[+e.dataset.st]));
   box.querySelectorAll("[data-allst]").forEach(e=>e.onclick=()=>sheetStories());
   box.querySelectorAll("[data-hist]").forEach(e=>e.onclick=()=>sheetHistory());
+  box.querySelectorAll("[data-wx]").forEach(e=>e.onclick=()=>sheetWeather());
   if($("#mini")) drawMini();
   const n=NATIVE?(cfg.nGranted||cfg.nbDismissed):(!("Notification" in window)||Notification.permission!=="default"||cfg.nbDismissed); $("#notifBanner").hidden=n;
 }
@@ -629,6 +638,21 @@ function sheetStories(){ const st=stories(); const day=d=>{ const t=new Date(); 
   let g={}; st.forEach((s,i)=>(g[day(s.time)]=g[day(s.time)]||[]).push([s,i]));
   openSheet(`<h3>Última hora</h3>`+["Hoje","Ontem","Antes"].filter(k=>g[k]).map(k=>`<div class="gtitle" style="margin:14px 0 6px">${k}</div>`+g[k].map(([s,i])=>`<button class="act" data-sti="${i}"><span class="am"><span class="t">${s.tags} ${esc(s.t)}</span><span class="s">${esc(s.s)} · ${ago(s.time)}</span></span></button>`).join("")).join(""));
   $("#sheet").querySelectorAll("[data-sti]").forEach(b=>b.onclick=()=>openStory(st[+b.dataset.sti])); }
+function sheetWeather(){ const w=S.wx; if(!w||!w.daily) return; const h=here(), d=w.daily, H=w.hourly; const now=Date.now();
+  const hrs=H.time.map((t,i)=>[new Date(t),i]).filter(([t])=>t.getTime()>=now-3600e3).slice(0,48);
+  const sig=modelSignals();
+  openSheet(`<h3>Previsão — ${esc(h.name)}</h3><div class="muted small">Open-Meteo (melhor modelo para o local) · atualizado ${ago(S.meta.wxT||Date.now())}</div>
+   ${sig.length?`<div class="gtitle" style="margin:14px 0 6px">Sinais nas próximas 72 h</div>`+sig.map(x=>`<div class="alert" style="--lc:${LVC[x.lvl]};margin-bottom:6px;cursor:default"><span class="lv"></span><span><span class="at">${esc(x.t)}</span><span class="as" style="display:block">${esc(x.d)}${x.when?` · a partir de ${fDT(x.when)}`:""}</span></span></div>`).join("")+`<p class="small muted">Calculados pela previsão; não substituem os avisos do IPMA.</p>`:""}
+   <div class="gtitle" style="margin:14px 0 6px">Próximas 48 horas</div>
+   <div style="overflow-x:auto;margin:0 -18px;padding:0 18px"><div style="display:flex;gap:6px;width:max-content">`+hrs.map(([t,i])=>`<div style="background:var(--s2);border-radius:12px;padding:8px 6px;min-width:58px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px">
+     <span class="muted">${t.getHours()===0?WDF.format(t).replace(".",""):TF.format(t)}</span>${wxIcon(H.weather_code[i])}<b style="font-size:14px">${T(H.temperature_2m[i])}</b>
+     <span style="color:var(--blue)">${num(H.precipitation_probability[i])}%</span><span class="mono" style="color:var(--blue)">${H.precipitation[i]>0?num(H.precipitation[i],1)+"mm":"·"}</span><span class="mono muted">${num(H.wind_speed_10m[i])}<br><span style="color:${H.wind_gusts_10m[i]>=60?"var(--orange)":"inherit"}">${num(H.wind_gusts_10m[i])}</span></span></div>`).join("")+`</div></div>
+   <div class="small muted" style="margin-top:4px">Por coluna: chuva (probabilidade e mm), vento médio e rajada em km/h.</div>
+   <div class="gtitle" style="margin:14px 0 6px">14 dias</div><div class="group">`+d.time.map((t,i)=>`<div class="item" style="cursor:default;gap:10px"><span style="width:44px" class="small">${i?WDF.format(new Date(t)).replace(".",""):"Hoje"}<br><span class="muted">${new Date(t).getDate()}/${new Date(t).getMonth()+1}</span></span>${wxIcon(d.weather_code[i])}
+     <span class="it"><b>${T(d.temperature_2m_min[i])} / ${T(d.temperature_2m_max[i])}</b><span>${esc(WMO[d.weather_code[i]]||"")}</span></span>
+     <span class="small mono" style="text-align:right;color:var(--fg2)"><span style="color:var(--blue)">${num(d.precipitation_sum[i],1)} mm · ${num(d.precipitation_probability_max[i])}%</span><br>rajada ${num(d.wind_gusts_10m_max[i])} · UV ${num(d.uv_index_max[i])}</span></div>`).join("")+`</div>
+   <div class="small muted" style="margin-top:8px">Nascer do sol ${d.sunrise?TF.format(new Date(d.sunrise[0])):"—"} · pôr do sol ${d.sunset?TF.format(new Date(d.sunset[0])):"—"}. A partir do 7.º dia a previsão é pouco fiável.</div>
+   <div class="row"><a class="btn y" href="https://www.ipma.pt/pt/otempo/prev.localidade.hora/" target="_blank" rel="noopener">Previsão IPMA</a><a class="btn" href="https://lusometeo.com/" target="_blank" rel="noopener">LusoMeteo</a></div>`); }
 function sheetHistory(){ const h=here(), a=nearestArea(h.lat,h.lon); const l=LS.get("hist",[]).filter(x=>x.area===a&&new Date(x.end)<Date.now());
   openSheet(`<h3>Alertas arquivados</h3><div class="muted small">${esc(areaName(a))} · últimos 30 dias (guardados neste telemóvel)</div>`+(l.length?l.map(x=>`<div class="act" style="cursor:default"><span class="ai" style="--ac:#1a1a1a;--ac-bg:${LVC[x.lvl]}">${ic(P.alert)}</span><span class="am"><span class="t">${esc(x.type)} · ${LVN[x.lvl]}</span><span class="m">${fDT(new Date(x.start))} → ${fDT(new Date(x.end))}</span></span></div>`).join(""):`<p class="empty">Sem alertas nos últimos 30 dias.</p>`)); }
 
@@ -811,7 +835,7 @@ function renderProfile(){
     v.innerHTML=hdr("Alertas de emergência")+`<div class="group">${sw("nAlerts","Ativar notificações de alertas")}</div><div class="ffoot">Seja avisado de perigos perto de si. Com a app fechada, o Android pode atrasar ou suspender os avisos (limitação das apps web).</div>
       <div class="group"><div class="item" style="cursor:default"><span class="it"><b>Avisar num raio de</b></span><select class="sel" id="nDist">${[10,25,50,100,200].map(x=>`<option value="${x}" ${cfg.nDist==x?"selected":""}>${x} km</option>`).join("")}</select></div>
       <div class="item" style="cursor:default"><span class="it"><b>Gravidade mínima</b></span><select class="sel" id="nMinLvl"><option value="yellow">Moderado e acima (amarelo)</option><option value="orange">Grave e acima (laranja)</option><option value="red">Só extremo (vermelho)</option></select></div></div>
-      <div class="gtitle">Tipos de perigo</div><div class="group">${sw("t_meteo","Tempo severo",t.meteo)}${sw("t_incendio","Incêndios",t.incendio)}${sw("t_sismo","Sismos (M3+)",t.sismo)}${NATIVE?sw("t_dd","Falhas de serviços (Downdetector)",t.dd):""}${sw("t_ar","Qualidade do ar",t.ar)}${sw("t_luz","Falhas de energia",t.luz)}</div>
+      <div class="gtitle">Tipos de perigo</div><div class="group">${sw("t_meteo","Tempo severo",t.meteo)}${sw("t_incendio","Incêndios",t.incendio)}${sw("t_sismo","Sismos (M3+)",t.sismo)}${sw("t_ar","Qualidade do ar",t.ar)}${sw("t_luz","Cortes de luz programados no meu concelho",t.luz)}</div>
       <div class="gtitle">Horas de silêncio</div><div class="group">${sw("quiet","Ativar horas de silêncio")}
         <div class="item" style="cursor:default"><span class="it"><b>Das</b></span><input class="sel" type="time" id="qFrom" value="${cfg.qFrom}"></div>
         <div class="item" style="cursor:default"><span class="it"><b>Às</b></span><input class="sel" type="time" id="qTo" value="${cfg.qTo}"></div></div>
@@ -833,7 +857,7 @@ function renderProfile(){
   else if(page==="loc"){
     v.innerHTML=hdr("Localização")+`<div class="w"><div class="small muted">Atual: ${esc(cfg.me.name)} (${cfg.me.lat.toFixed(3)}, ${cfg.me.lon.toFixed(3)})${cfg.gps?" · GPS":""}</div><button class="btn y" id="gpsB">${ic(P.nav,"i s")}Usar a minha localização</button><input class="inp" id="locQ" placeholder="Ou pesquise uma localidade"><div id="locR"></div></div>
       <div class="ffoot">A localização fica só neste telemóvel e é usada para pedir dados às fontes públicas.</div>`;
-    $("#gpsB").onclick=()=>useGPS(); placeSearch($("#locQ"),$("#locR"),x=>{ cfg.me={lat:x.latitude,lon:x.longitude,name:x.name}; cfg.gps=false; cfg.sel="me"; save(); toast("Localização: "+x.name); renderProfile(); refresh(); });
+    $("#gpsB").onclick=()=>useGPS(); placeSearch($("#locQ"),$("#locR"),x=>{ cfg.me={lat:x.latitude,lon:x.longitude,name:x.name,concelho:x.admin2||x.name}; cfg.gps=false; cfg.sel="me"; save(); toast("Localização: "+x.name); renderProfile(); refresh(); });
   }
   else if(page==="units"){ v.innerHTML=hdr("Unidades")+`<div class="group"><button class="item" data-u="C"><span class="it"><b>Celsius (°C)</b></span>${cfg.temp==="C"?ic(P.check,"i s"):""}</button><button class="item" data-u="F"><span class="it"><b>Fahrenheit (°F)</b></span>${cfg.temp==="F"?ic(P.check,"i s"):""}</button></div>`;
     v.querySelectorAll("[data-u]").forEach(b=>b.onclick=()=>{ cfg.temp=b.dataset.u; save(); renderProfile(); renderWidgets(); }); }
@@ -845,7 +869,7 @@ function renderProfile(){
   else if(page==="about"){
     v.innerHTML=hdr("Sobre e fontes")+`<div class="w guide"><p class="lead" style="margin:0">A Sentinela é gratuita, sem contas e sem publicidade. Junta num só sítio os dados públicos de emergência para Portugal.</p><ul>
       <li><b>Avisos meteorológicos, sismos e risco de incêndio:</b> IPMA</li><li><b>Ocorrências:</b> Proteção Civil (ANEPC), a mesma camada do mapa de prociv.gov.pt/pt/ocorrencias</li>
-      <li><b>Falhas de energia:</b> dados abertos E-REDES</li><li><b>Outros serviços:</b> ligação ao Downdetector</li><li><b>Tempo e qualidade do ar:</b> Open-Meteo / CAMS</li>
+      <li><b>Cortes de luz programados:</b> dados abertos E-REDES</li><li><b>Google:</b> painel de estado oficial · <b>Operadoras e apps:</b> ligação ao Downdetector</li><li><b>Tempo, previsão a 14 dias e sinais de tempo severo:</b> Open-Meteo · <b>Qualidade do ar:</b> CAMS</li><li><b>Artigos do tempo:</b> LusoMeteo (lusometeo.com)</li>
       <li><b>Radar:</b> RainViewer · <b>Satélite:</b> NASA GIBS · <b>Mapa e abrigos:</b> © OpenStreetMap, CARTO, Esri</li></ul>
       <p class="small muted" style="margin:0">Não é um serviço oficial nem substitui os alertas por SMS da Proteção Civil. Em emergência ligue 112.</p></div>
       <button class="btn o" id="reOnb">Ver introdução outra vez</button>`;
@@ -894,13 +918,13 @@ function placeSearch(input,out,onPick){ let t; input.oninput=()=>{ clearTimeout(
 function openCityPicker(){
   openSheet(`<h3>Seguir uma cidade</h3><p class="small">Veja alertas e atividade de outro sítio, por exemplo onde vive a família ou onde trabalha.</p><input class="inp" id="cityQ" placeholder="Nome da localidade" autocomplete="off"><div id="cityR"></div>`);
   setTimeout(()=>$("#cityQ").focus(),100);
-  placeSearch($("#cityQ"),$("#cityR"),x=>{ const id="c"+Math.round(x.latitude*1000)+"_"+Math.round(x.longitude*1000); if(!cfg.cities.find(c=>c.id===id)) cfg.cities.push({id,name:x.name,lat:x.latitude,lon:x.longitude,notify:true}); cfg.sel=id; save(); closeSheet(); toast("A seguir "+x.name); renderPlaces(); if(page==="nAlerts") renderProfile(); refresh(); });
+  placeSearch($("#cityQ"),$("#cityR"),x=>{ const id="c"+Math.round(x.latitude*1000)+"_"+Math.round(x.longitude*1000); if(!cfg.cities.find(c=>c.id===id)) cfg.cities.push({id,name:x.name,concelho:x.admin2||x.name,lat:x.latitude,lon:x.longitude,notify:true}); cfg.sel=id; save(); closeSheet(); toast("A seguir "+x.name); renderPlaces(); if(page==="nAlerts") renderProfile(); refresh(); });
 }
 function useGPS(after){
   if(!navigator.geolocation){ toast("Este browser não dá acesso à localização."); after&&after(); return; }
-  navigator.geolocation.getCurrentPosition(async p=>{ const lat=p.coords.latitude,lon=p.coords.longitude; let name="A minha localização";
-    try{ const r=await getJSON(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&accept-language=pt`); const a=r.data.address||{}; name=a.city||a.town||a.village||a.municipality||a.county||name; }catch(e){}
-    cfg.me={lat,lon,name}; cfg.gps=true; cfg.sel="me"; save(); renderPlaces(); if(page==="loc") renderProfile(); refresh(); after&&after(); },
+  navigator.geolocation.getCurrentPosition(async p=>{ const lat=p.coords.latitude,lon=p.coords.longitude; let name="A minha localização", conc="";
+    try{ const r=await getJSON(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10&accept-language=pt`); const a=r.data.address||{}; name=a.city||a.town||a.village||a.municipality||a.county||name; conc=a.municipality||a.city||a.town||a.county||name; }catch(e){}
+    cfg.me={lat,lon,name,concelho:conc}; cfg.gps=true; cfg.sel="me"; save(); renderPlaces(); if(page==="loc") renderProfile(); refresh(); after&&after(); },
     e=>{ toast(e.code===1?"Acesso à localização recusado. Pode escolher a localidade no Perfil.":"Não foi possível obter a localização."); after&&after(); },{timeout:15000,maximumAge:600000}); }
 
 /* ======================================================================
@@ -925,7 +949,7 @@ function checkNotify(){
       S.warnings.filter(w=>areas.has(w.area)&&LVL[w.lvl]>=LVL[cfg.nMinLvl]).forEach(w=>{ const k="w|"+w.id; if(!seen.has(k)){ add.push(k); if(!first) notify(`Aviso ${LVN[w.lvl].toLowerCase()}: ${w.type}`,`${areaName(w.area)} · ${fDT(w.start)} → ${fDT(w.end)}`,k,LVL[w.lvl]>=2); } }); }
     if(cfg.nTypes.incendio) S.act.filter(a=>a.kind==="fire"&&!a.stale).forEach(a=>{ const d=Math.min(...places.map(p=>km(p.lat,p.lon,a.lat,a.lon))); const k="f|"+a.id; if(d<=cfg.nDist&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} a ${fKm(d)}`,`${a.loc} · ${a.status}`,k,d<5); } });
     if(cfg.nTypes.sismo) S.quakes.forEach(q=>{ const d=Math.min(...places.map(p=>km(p.lat,p.lon,q.lat,q.lon))); const k="q|"+q.id; if(q.mag>=3&&d<=Math.max(cfg.nDist,100)&&Date.now()-q.time<864e5&&!seen.has(k)){ add.push(k); if(!first) notify(`Sismo M${num(q.mag,1)} a ${fKm(d)}`,`${q.region}, ${fDT(q.time)}`,k,q.mag>=4.5); } });
-    if(cfg.nTypes.dd&&S.dd&&!S.dd.fail){ const prev=S.dd.prev||{}; DD.forEach(([n,slug])=>{ const st=S.dd.res[slug]&&S.dd.res[slug].st; if((st==="bad"||st==="warn")&&prev[slug]!==st&&prev[slug]!=="bad"){ const k="dd|"+slug+"|"+st+"|"+new Date().toDateString(); if(!seen.has(k)){ add.push(k); if(!first) notify(`${n}: ${st==="bad"?"problemas":"possíveis problemas"}`,"Relatos de utilizadores no Downdetector",k,false); } } }); }
+    if(cfg.nTypes.luz&&S.outages) S.outages.items.forEach(x=>{ const k="luz|"+x.par+"|"+x.start.toISOString(); if(!seen.has(k)){ add.push(k); if(!first) notify(`Corte de luz programado: ${x.par}`,`${fDT(x.start)} → ${TF.format(x.end)} · E-REDES`,k,false); } });
     if(cfg.nTypes.ar&&S.aq&&S.aq.current&&S.aq.current.european_aqi>60){ const k="ar|"+new Date().toDateString(); if(!seen.has(k)){ add.push(k); if(!first) notify("Qualidade do ar fraca",`Índice ${S.aq.current.european_aqi} em ${here().name}`,k,false); } }
   }
   if(cfg.nAct) S.act.filter(a=>!a.stale).forEach(a=>{ const d=km(cfg.me.lat,cfg.me.lon,a.lat,a.lon); const k="a|"+a.id; if(d<=cfg.nActR&&!seen.has(k)){ add.push(k); if(!first) notify(`${a.nat} perto de si (${fKm(d)})`,`${a.loc} · ${a.man} operacionais`,k,false); } });
@@ -975,7 +999,7 @@ async function refresh(){
   if(busy) return; busy=true; $("#refreshBtn").classList.add("spin"); S.fails=[];
   $("#offlineBanner").hidden=navigator.onLine!==false;
   renderWidgets();
-  const jobs=[["alertas",loadWarnings],["ocorrências",loadActivity],["sismos",loadQuakes],["risco de incêndio",loadRcm],["tempo",loadWx],["qualidade do ar",loadAq],["energia",loadOutages]]; if(NATIVE) jobs.push(["downdetector",loadDD]);
+  const jobs=[["alertas",loadWarnings],["ocorrências",loadActivity],["sismos",loadQuakes],["risco de incêndio",loadRcm],["tempo",loadWx],["qualidade do ar",loadAq],["cortes de luz",loadOutages],["Google",loadGoogle],["artigos",loadLuso]];
   await Promise.all(jobs.map(async([n,f])=>{ try{ await f(); }catch(e){ console.warn(n,e); S.fails.push(n); } renderWidgets(); drawMap(); }));
   S.lastAct=S.act.reduce((m,a)=>a.time&&a.time>m?a.time:m,null);
   const off=LS.get("offSh"); if(off&&!S.shelters.length) S.shelters=off.items.slice();

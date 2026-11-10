@@ -7,8 +7,10 @@ Endereço: https://ricktau86-ai.github.io/sentinela/
 ## Fontes
 - IPMA: avisos meteorológicos, sismos, risco de incêndio
 - Proteção Civil (ANEPC): ocorrências, lidas do portal ArcGIS que alimenta prociv.gov.pt/pt/ocorrencias (camada Ocorrencias_Base, lida diretamente pelo telemóvel)
-- E-REDES (dados abertos): falhas de energia
-- Downdetector: atalhos (não tem API gratuita)
+- E-REDES (dados abertos): cortes de luz programados
+- Google: painel de estado oficial
+- LusoMeteo: artigos do tempo
+- Downdetector: atalhos (bloqueia leitura automática)
 - Open-Meteo/CAMS: tempo e qualidade do ar · RainViewer: radar · NASA GIBS: satélite
 - OpenStreetMap: mapa, abrigos, bunkers, pontos de encontro, hospitais, bombeiros, polícia
 
