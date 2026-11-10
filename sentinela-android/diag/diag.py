@@ -1,16 +1,13 @@
-import urllib.request, json
+import urllib.request, urllib.parse, json, datetime
 H={"User-Agent":"Mozilla/5.0"}
-def g(u):
-    with urllib.request.urlopen(urllib.request.Request(u,headers=H),timeout=30) as r: return json.loads(r.read())
-B="https://e-redes.opendatasoft.com/api/explore/v2.1"
-off=0
-while True:
-    d=g(B+f"/catalog/datasets?limit=100&offset={off}")
-    for x in d["results"]:
-        m=x.get("metas",{}).get("default",{}); print("DS",x["dataset_id"],"|",m.get("title"),"|",m.get("modified"),"|",m.get("records_count"))
-    off+=100
-    if off>=d["total_count"]: break
-d=g(B+"/catalog/datasets/network-scheduling-work/records?limit=0&group_by=data&order_by=data")
-print("NSW por dia",json.dumps(d)[:800])
-d=g(B+"/catalog/datasets/network-scheduling-work/records?where=municipality%3D%22Leiria%22&limit=5&order_by=startdatetime")
-print("LEIRIA",json.dumps(d,ensure_ascii=False)[:1200])
+base="https://e-redes.opendatasoft.com/api/explore/v2.1/catalog/datasets/network-scheduling-work/records"
+now=datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"); wk=(datetime.datetime.utcnow()+datetime.timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
+for conc in ["Leiria","Pombal","Viseu","Bragança"]:
+    q=urllib.parse.quote(f'search(municipality,"{conc}") and enddatetime>=date\'{now}\'')
+    try: d=json.loads(urllib.request.urlopen(urllib.request.Request(f"{base}?where={q}&order_by=startdatetime&limit=3",headers=H),timeout=30).read()); print("MUN",conc,d["total_count"],json.dumps(d["results"][:1],ensure_ascii=False))
+    except urllib.error.HTTPError as e: print("ERR",conc,e.code,e.read()[:300])
+q=urllib.parse.quote(f"enddatetime>=date'{now}' and startdatetime<=date'{wk}'")
+try: d=json.loads(urllib.request.urlopen(urllib.request.Request(f"{base}?where={q}&limit=0",headers=H),timeout=30).read()); print("NAT",d["total_count"])
+except urllib.error.HTTPError as e: print("ERR nat",e.code,e.read()[:300])
+d=json.loads(urllib.request.urlopen(urllib.request.Request("https://www.google.com/appsstatus/dashboard/incidents.json",headers=H),timeout=30).read())
+act=[i for i in d if not i.get("end")]; print("GWS ativos",len(act), json.dumps(act[:1],ensure_ascii=False)[:600]); print("GWS keys",list(d[0].keys()))
