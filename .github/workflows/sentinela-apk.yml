@@ -23,7 +23,7 @@ jobs:
       - name: Preparar a app web
         run: |
           npm install --no-audit --no-fund
-          rm -rf www && mkdir www && cp -r ../sentinela/index.html ../sentinela/manifest.webmanifest ../sentinela/icons ../sentinela/vendor www/
+          rm -rf www && mkdir www && cp -r ../sentinela/index.html ../sentinela/extra.js ../sentinela/manifest.webmanifest ../sentinela/icons ../sentinela/vendor www/
       - name: Criar projeto Android
         run: |
           npx cap add android
@@ -35,6 +35,12 @@ jobs:
           G=android/app/build.gradle
           sed -i -E "s/versionCode [0-9]+/versionCode $((100 + ${{ github.run_number }}))/; s/versionName \"[^\"]*\"/versionName \"1.${{ github.run_number }}\"/" $G
           cp sentinela.keystore android/app/sentinela.keystore
+          # widget e verificação em segundo plano (código nativo)
+          cp -r native/java/* android/app/src/main/java/
+          cp -r native/res/* android/app/src/main/res/
+          sed -i 's#</application>#    <receiver android:name=".SentinelaWidget" android:exported="true" android:label="Sentinela"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" /></receiver>\n    </application>#' $M
+          printf '\ndependencies {\n    implementation "androidx.work:work-runtime:2.9.1"\n}\n' >> $G
+          grep -n "SentinelaWidget" $M
           cat >> $G <<'GRADLE'
           android {
               signingConfigs {

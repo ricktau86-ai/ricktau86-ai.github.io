@@ -1,6 +1,6 @@
 /* Sentinela — service worker: guarda a app para abrir sem rede; os dados vêm sempre da rede (com cópia local na app) */
-const CACHE = "sentinela-v7";
-const SHELL = ["./", "index.html", "manifest.webmanifest", "vendor/leaflet.js", "vendor/leaflet.css", "icons/icon-192.png", "icons/icon-512.png"];
+const CACHE = "sentinela-v8";
+const SHELL = ["./", "index.html", "manifest.webmanifest", "vendor/leaflet.js", "vendor/leaflet.css", "icons/icon-192.png", "icons/icon-512.png", "extra.js"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

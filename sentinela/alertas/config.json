@@ -1,0 +1,12 @@
+{
+  "_ajuda": "Locais a vigiar e limites dos alertas enviados para o Telegram. Pode editar este ficheiro no GitHub.",
+  "locais": [
+    { "nome": "Leiria", "lat": 39.7436, "lon": -8.8071 }
+  ],
+  "ipma_nivel_minimo": "yellow",
+  "ocorrencias_raio_km": 15,
+  "ocorrencias_ignorar_mais_de_dias": 3,
+  "sismo_magnitude_minima": 3.0,
+  "sismo_raio_km": 150,
+  "fogos_satelite_raio_km": 20
+}

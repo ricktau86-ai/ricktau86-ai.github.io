@@ -1,0 +1,31 @@
+name: Sentinela - alertas Telegram
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: sentinela-alertas
+  cancel-in-progress: false
+jobs:
+  alertas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: sentinela/alertas }
+      - name: Estado anterior
+        run: |
+          git fetch -q origin sentinela-estado 2>/dev/null && git show origin/sentinela-estado:estado.json > /tmp/estado.json 2>/dev/null || echo '{}' > /tmp/estado.json
+      - name: Verificar e enviar
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 sentinela/alertas/alertas.py /tmp/estado.json
+      - name: Guardar estado
+        run: |
+          cd /tmp && rm -rf st && mkdir st && cd st && git init -q -b sentinela-estado
+          cp /tmp/estado.json estado.json && git add estado.json
+          git -c user.name="sentinela-bot" -c user.email="sentinela-bot@users.noreply.github.com" commit -q -m "estado"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" sentinela-estado
