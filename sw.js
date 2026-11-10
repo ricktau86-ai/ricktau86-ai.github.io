@@ -64,6 +64,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
+    // 0. A Sentinela (/sentinela/) e descargas de APK não passam por este service worker
+    if (url.pathname.startsWith('/sentinela/') || /\.(apk|zip)$/i.test(url.pathname)) {
+        return;
+    }
+
     // 1. Nunca fazer cache de Firestore / Auth (dados em tempo real)
     if (NO_CACHE_HOSTS.some(h => url.hostname.includes(h))) {
         return; // Passa direto para a rede

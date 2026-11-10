@@ -1,5 +1,5 @@
 /* Sentinela — service worker: guarda a app para abrir sem rede; os dados vêm sempre da rede (com cópia local na app) */
-const CACHE = "sentinela-v6";
+const CACHE = "sentinela-v7";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "vendor/leaflet.js", "vendor/leaflet.css", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -11,6 +11,7 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const u = new URL(e.request.url);
   if (e.request.method !== "GET" || u.origin !== location.origin) return; // APIs externas: direto à rede
+  if (/\.(apk|zip)$/i.test(u.pathname) || e.request.mode === "navigate" && !/\/sentinela\/(index\.html)?$/.test(u.pathname)) return; // descargas: nunca passam pelo service worker
   // Rede primeiro para a app (para receber atualizações), cache se estiver sem rede
   e.respondWith(
     fetch(e.request).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r; })
