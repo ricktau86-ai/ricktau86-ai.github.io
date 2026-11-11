@@ -209,7 +209,7 @@ COSTA = [("A Coruña",43.37,-8.40),("Finisterra",42.91,-9.26),("Vigo",42.24,-8.7
  ("Pedrógão (Leiria)",39.92,-8.95),("São Pedro de Moel",39.76,-9.03),("Nazaré",39.60,-9.07),("Peniche",39.36,-9.38),("Ericeira",38.96,-9.42),
  ("Cascais",38.70,-9.42),("Costa da Caparica",38.64,-9.24),("Sesimbra",38.44,-9.10),("Comporta",38.38,-8.80),("Sines",37.95,-8.87),
  ("Vila Nova de Milfontes",37.72,-8.79),("Zambujeira do Mar",37.52,-8.79),("Aljezur",37.32,-8.86),("Sagres",37.01,-8.94),("Lagos",37.10,-8.67),
- ("Portimão",37.12,-8.54),("Albufeira",37.08,-8.25),("Faro",37.00,-7.93),("Tavira",37.12,-7.65),("Vila Real de Santo António",37.19,-7.42),("Cádis",36.53,-6.30)]
+ ("Portimão",37.12,-8.54),("Albufeira",37.08,-8.25),("Faro",37.00,-7.93),("Tavira",37.12,-7.65),("Vila Real de Santo António",37.19,-7.42),("Ayamonte",37.21,-7.40),("Huelva",37.20,-6.95),("Matalascañas",37.01,-6.56),("Chipiona",36.74,-6.43),("Cádis",36.53,-6.30)]
 
 def load_land():
     url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson"
@@ -220,23 +220,26 @@ def load_land():
     return unary_union([shape(f["geometry"]).intersection(clip) for f in g["features"] if shape(f["geometry"]).intersects(clip)])
 
 def landfall(tracks, run_dt, land):
+    """Ponto exato onde cada cenário cruza a linha de costa (amostragem fina de cada troço da trajetória)."""
     from shapely.geometry import Point
     hits = []
     for tr in tracks:
+        if not tr or Point(tr[0]["lon"], tr[0]["lat"]).within(land): continue
+        done = False
         for a, b in zip(tr, tr[1:]):
-            if Point(a["lon"], a["lat"]).within(land): break
-            if Point(b["lon"], b["lat"]).within(land):
-                for h in range(1, 7):  # interpolar de hora a hora
-                    f = h / (b["step"] - a["step"]) if b["step"] > a["step"] else 1
-                    la = a["lat"] + (b["lat"] - a["lat"]) * f; lo = a["lon"] + (b["lon"] - a["lon"]) * f
-                    if Point(lo, la).within(land) or f >= 1:
-                        hits.append((la, lo, a["step"] + h)); break
-                break
+            if not Point(b["lon"], b["lat"]).within(land): continue
+            N = 80
+            for k in range(1, N + 1):
+                f = k / N
+                la = a["lat"] + (b["lat"] - a["lat"]) * f; lo = a["lon"] + (b["lon"] - a["lon"]) * f
+                if Point(lo, la).within(land):
+                    hits.append((la, lo, a["step"] + f * (b["step"] - a["step"]))); done = True; break
+            if done: break
     if len(hits) < max(5, 0.3 * len(tracks)): return None
     idx = sorted(min(range(len(COSTA)), key=lambda i: km(h[0], h[1], COSTA[i][1], COSTA[i][2])) for h in hits)
     times = sorted(h[2] for h in hits)
     q = lambda arr, p: arr[min(len(arr)-1, int(round(p * (len(arr)-1))))]
-    T = lambda s: (run_dt + dt.timedelta(hours=s)).replace(tzinfo=dt.timezone.utc).isoformat()
+    T = lambda s: (run_dt + dt.timedelta(minutes=round(s * 4) * 15)).replace(tzinfo=dt.timezone.utc).isoformat()
     return {"cenarios": len(hits), "de": len(tracks), "troco": [COSTA[q(idx, .1)][0], COSTA[q(idx, .9)][0]],
             "mais_provavel": COSTA[q(idx, .5)][0], "janela": [T(q(times, .25)), T(q(times, .75))], "margem": [T(q(times, .1)), T(q(times, .9))],
             "pontos": [[round(h[0], 2), round(h[1], 2)] for h in hits]}

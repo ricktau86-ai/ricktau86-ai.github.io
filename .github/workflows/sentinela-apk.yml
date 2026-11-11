@@ -23,7 +23,7 @@ jobs:
       - name: Preparar a app web
         run: |
           npm install --no-audit --no-fund
-          rm -rf www && mkdir www && cp -r ../sentinela/index.html ../sentinela/extra.js ../sentinela/noticias.js ../sentinela/manifest.webmanifest ../sentinela/icons ../sentinela/vendor www/
+          rm -rf www && mkdir www && cp -r ../sentinela/index.html ../sentinela/extra.js ../sentinela/noticias.js ../sentinela/tempestades.js ../sentinela/manifest.webmanifest ../sentinela/icons ../sentinela/vendor www/
       - name: Criar projeto Android
         run: |
           npx cap add android
