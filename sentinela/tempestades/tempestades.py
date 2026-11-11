@@ -184,10 +184,12 @@ def track(fields, steps, lats, lons, member, start, max_move_km=750):
     for k, st in enumerate(steps):
         f = fields[st][member]
         guess = (cur[0] + vel[0], cur[1] + vel[1]) if k else cur
-        r = 350 if k == 0 else max_move_km
+        dh = st - steps[k-1] if k else 0
+        r = 350 if k == 0 else max_move_km * dh / 6
         found = local_min_near(f, lats, lons, guess[0], guess[1], r)
         if found is None: break
         if k: vel = (found[0] - cur[0], found[1] - cur[1])
+        if found[2] > 1012: break  # depressão desfeita
         cur = found; pts.append({"step": st, "lat": round(found[0], 2), "lon": round(found[1], 2), "p": round(found[2], 1)})
     return pts
 
@@ -240,7 +242,7 @@ def landfall(tracks, run_dt, land):
             "pontos": [[round(h[0], 2), round(h[1], 2)] for h in hits]}
 
 def storms_from_ens(run_dt):
-    steps = list(range(0, 97, 6))
+    steps = list(range(0, 73, 3)) + list(range(78, 97, 6))
     fields, lats, lons = ens_fields(run_dt, steps)
     nmem = fields[0].shape[0]
     mean0 = fields[0].mean(axis=0)
@@ -256,10 +258,11 @@ def storms_from_ens(run_dt):
         mean_pts, radii, mean_out = [], [], []
         for st in steps:
             at = [next((q for q in t if q["step"] == st), None) for t in tracks]; at = [q for q in at if q]
-            if len(at) < max(10, 0.4 * len(tracks)): break
+            if len(at) < max(10, 0.6 * len(tracks)): break
             mla = float(np.mean([q["lat"] for q in at])); mlo = float(np.mean([q["lon"] for q in at]))
             d = sorted(km(mla, mlo, q["lat"], q["lon"]) for q in at)
             r80 = d[min(len(d)-1, int(round(0.8 * (len(d)-1))))]
+            if r80 > 650 and len(mean_out) >= 3: break  # cenários demasiado espalhados: a trajetória deixa de ser fiável
             mean_pts.append((mla, mlo)); radii.append(r80)
             mean_out.append({"t": (run_dt + dt.timedelta(hours=st)).replace(tzinfo=dt.timezone.utc).isoformat(), "step": st, "lat": round(mla, 2), "lon": round(mlo, 2),
                              "p": round(float(np.median([q["p"] for q in at])), 1), "r80": round(r80), "n": len(at)})
@@ -268,7 +271,7 @@ def storms_from_ens(run_dt):
         if dmin > 900: continue  # só depressões que se aproximam de Portugal
         st = {"id": f"{round(la)}_{round(lo)}", "inicio": {"lat": round(la, 2), "lon": round(lo, 2), "p": round(p, 1)},
               "media": mean_out, "cone": cone_polygon(mean_pts, radii), "cenarios": len(tracks),
-              "trajetorias": [[[q["lat"], q["lon"]] for q in t] for t in tracks],
+              "trajetorias": [[[q["lat"], q["lon"]] for q in t if q["step"] <= mean_out[-1]["step"]] for t in tracks],
               "pmin": min(q["p"] for q in mean_out), "dist_pt_min_km": round(dmin)}
         st["entrada_em_terra"] = landfall(tracks, run_dt, land) if land is not None else None
         storms.append(st)
@@ -280,6 +283,15 @@ def storms_from_ens(run_dt):
     li = np.abs(lats - LEIRIA[0]).argmin(); lj = np.abs(lons - LEIRIA[1]).argmin()
     pl = [{"t": (run_dt + dt.timedelta(hours=s)).replace(tzinfo=dt.timezone.utc).isoformat(), "p10": round(float(np.percentile(fields[s][:, li, lj], 10)), 1),
            "p50": round(float(np.percentile(fields[s][:, li, lj], 50)), 1), "p90": round(float(np.percentile(fields[s][:, li, lj], 90)), 1)} for s in steps]
+    try:
+        nomes = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "nomes.json"), encoding="utf-8"))
+    except Exception:
+        nomes = []
+    hoje = run_dt.strftime("%Y-%m-%d")
+    for s in uniq:
+        for n in [x for x in nomes if "nome" in x]:
+            if n.get("ate", "9999") >= hoje and km(s["inicio"]["lat"], s["inicio"]["lon"], n["lat"], n["lon"]) <= n.get("raio_km", 900):
+                s["nome"] = n["nome"]; break
     return uniq[:3], nmem, pl
 
 def main():

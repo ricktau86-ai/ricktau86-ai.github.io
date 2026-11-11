@@ -1,0 +1,4 @@
+[
+  { "_ajuda": "Nomes atribuídos pelo IPMA/AEMET/Météo-France. A depressão cujo centro inicial estiver a menos de raio_km deste ponto recebe o nome, até à data 'ate'." },
+  { "nome": "Charles", "lat": 33.0, "lon": -21.0, "raio_km": 900, "ate": "2026-11-13" }
+]
