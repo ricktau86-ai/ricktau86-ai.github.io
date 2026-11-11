@@ -1,0 +1,9 @@
+name: Sentinela - diagnóstico
+on: { workflow_dispatch: {} }
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -q ecmwf-opendata cfgrib xarray eccodes shapely matplotlib 2>&1 | tail -2; python3 -c "import eccodes;print('eccodes',eccodes.codes_get_api_version())"
+      - run: python3 sentinela-android/diag/diag.py
