@@ -142,16 +142,8 @@
         <div class="small muted">Grãos por m³, previsão do modelo europeu CAMS (Open-Meteo). Níveis aproximados. Fora da época de floração os valores ficam perto de zero.</div>`;
     }
     html += `</div>`;
-    // Telegram e widget
-    html += `<div class="w"><div class="wh"><h2>Alertas no Telegram</h2></div>
-      <div class="small muted">Avisos com a app fechada e o telemóvel bloqueado: avisos do IPMA, ocorrências da Proteção Civil, sismos e focos de calor perto dos locais configurados. Verifica de 5 em 5 minutos (o GitHub pode atrasar alguns minutos).</div>
-      <ol class="small" style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;color:var(--fg2)">
-        <li>No Telegram, fale com <b>@BotFather</b>, envie <b>/newbot</b> e copie o código (token) que ele dá.</li>
-        <li>No GitHub: repositório <b>ricktau86-ai.github.io</b> → Settings → Secrets and variables → Actions → New repository secret. Nome <b>TELEGRAM_TOKEN</b>, valor: o token.</li>
-        <li>Envie "olá" ao seu bot novo. Em até 5 minutos chega "Sentinela ligada".</li></ol>
-      <a class="small" href="https://github.com/ricktau86-ai/ricktau86-ai.github.io/settings/secrets/actions/new" target="_blank" rel="noopener">Abrir a página dos segredos no GitHub</a>
-      <div class="small muted">Os locais vigiados estão no ficheiro sentinela/alertas/config.json (Leiria por defeito).</div></div>
-      <div class="w"><div class="wh"><h2>Widget no ecrã inicial</h2></div>
+    // Widget
+    html += `<div class="w"><div class="wh"><h2>Widget no ecrã inicial</h2></div>
       <div class="small muted">${NATIVE ? `Toque sem largar no ecrã inicial → Widgets → Sentinela. Mostra o aviso mais grave do IPMA para ${esc(areaName(nearestArea(h.lat, h.lon)))} e a temperatura, e atualiza de 30 em 30 minutos mesmo com a app fechada. Avisos laranja e vermelhos novos geram notificação.` : "Disponível na app Android."}</div>
       ${NATIVE && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SentinelaWidget ? `<button class="btn o" id="wRefresh">Atualizar widget agora</button>` : ""}
       <div class="small muted">Em telemóveis Xiaomi ative "Início automático" e tire a Sentinela da poupança de bateria, senão o sistema pode parar a verificação em segundo plano.</div></div>
