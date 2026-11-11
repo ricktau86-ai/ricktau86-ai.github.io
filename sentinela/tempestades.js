@@ -120,9 +120,9 @@
     const bars = H.map(h => `<rect x="${X(h.t) - bw / 2}" y="${Hh - 4 - (h.chuva3h / rmax) * 26}" width="${bw}" height="${(h.chuva3h / rmax) * 26}" fill="#4fc3f7" opacity=".8"/>`).join("");
     const gl = H.filter(h => h.rajada != null);
     const gust = `<polyline fill="none" stroke="#ff9800" stroke-width="2" points="${gl.map(h => `${X(h.t)},${8 + (1 - h.rajada / gmax) * (Hh - 40)}`).join(" ")}"/>`;
-    const pres = `<polyline fill="none" stroke="#e6e1e5" stroke-width="2" points="${H.map(h => `${X(h.t)},${Yp(h.p)}`).join(" ")}"/>`;
+    const pres = `<polyline fill="none" style="stroke:var(--fg)" stroke-width="2" points="${H.map(h => `${X(h.t)},${Yp(h.p)}`).join(" ")}"/>`;
     const nowX = Date.now() > t0 && Date.now() < t1 ? `<line x1="${X(new Date().toISOString())}" x2="${X(new Date().toISOString())}" y1="4" y2="${Hh - 4}" stroke="#ffeb3b" stroke-dasharray="3 3"/>` : "";
-    const days = []; for (let t = t0; t <= t1; t += 3600e3) { const d = new Date(t); if (d.getHours() === 0) days.push(`<line x1="${X(d.toISOString())}" x2="${X(d.toISOString())}" y1="4" y2="${Hh - 4}" stroke="#3a3a3a"/><text x="${X(d.toISOString()) + 3}" y="${Hh - 32}" fill="#938f99" font-size="9">${new Intl.DateTimeFormat("pt-PT", { weekday: "short" }).format(d)}</text>`); }
+    const days = []; for (let t = t0; t <= t1; t += 3600e3) { const d = new Date(t); if (d.getHours() === 0) days.push(`<line x1="${X(d.toISOString())}" x2="${X(d.toISOString())}" y1="4" y2="${Hh - 4}" style="stroke:var(--s3)"/><text x="${X(d.toISOString()) + 3}" y="${Hh - 32}" fill="#938f99" font-size="9">${new Intl.DateTimeFormat("pt-PT", { weekday: "short" }).format(d)}</text>`); }
     const gpk = gl.reduce((m, h) => h.rajada > m.rajada ? h : m, gl[0] || { rajada: 0 });
     const tot = H.reduce((s, h) => s + (h.chuva3h || 0), 0); const ppk = H.reduce((m, h) => h.p < m.p ? h : m, H[0]);
     return `<div class="w"><div class="wh"><h2>Leiria — próximas 72 h</h2><span class="small muted">ECMWF</span></div>
@@ -131,7 +131,7 @@
       <div><span class="k">Pressão mínima</span><span class="v">${Math.round(ppk.p)} hPa</span><span class="q" style="--qc:var(--fg2)">${fh(ppk.t)}</span></div></div>
       <div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${Hh}" style="width:100%;max-width:${W * 1.4}px;height:auto;display:block">${days}${band}${bars}${pres}${gust}${nowX}
         <text x="2" y="${Yp(pmax) + 4}" fill="#938f99" font-size="9">${pmax}</text><text x="2" y="${Yp(pmin)}" fill="#938f99" font-size="9">${pmin}</text></svg></div>
-      <div class="small muted"><span style="color:#e6e1e5">━</span> pressão (hPa) com <span style="color:#90caf9">faixa de 80% dos cenários</span> · <span style="color:#ff9800">━</span> rajadas (máx. ${Math.round(gmax)} km/h no topo) · <span style="color:#4fc3f7">▮</span> chuva por 3 h<br>Valores do modelo para a quadrícula de Leiria (~25 km). Os avisos do IPMA abrangem todo o distrito, incluindo o litoral, onde o vento costuma ser mais forte.</div></div>`;
+      <div class="small muted"><span style="color:var(--fg)">━</span> pressão (hPa) com <span style="color:#90caf9">faixa de 80% dos cenários</span> · <span style="color:#ff9800">━</span> rajadas (máx. ${Math.round(gmax)} km/h no topo) · <span style="color:#4fc3f7">▮</span> chuva por 3 h<br>Valores do modelo para a quadrícula de Leiria (~25 km). Os avisos do IPMA abrangem todo o distrito, incluindo o litoral, onde o vento costuma ser mais forte.</div></div>`;
   }
 
   /* ---------- separador ---------- */
@@ -145,7 +145,7 @@
     h += `<div class="w" style="padding:0;overflow:hidden;gap:0">
       <div id="tmap" style="height:58vh;min-height:320px;max-height:560px;position:relative"></div>
       <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;gap:10px;align-items:center"><button class="rbtn" id="tPlay" aria-label="Reproduzir" style="background:var(--y);color:var(--on-y)"></button>
+        <div style="display:flex;gap:10px;align-items:center"><button class="rbtn" id="tPlay" aria-label="Reproduzir" style="background:var(--y-bg);color:var(--on-y)"></button>
           <input type="range" id="tSlider" min="0" max="${d.frames.times.length - 1}" value="${T.idx}" style="flex:1;accent-color:var(--y)">
           <button class="chip" id="tSpeed" style="padding:6px 10px">${T.speed}×</button></div>
         <div style="display:flex;justify-content:space-between;align-items:center"><b id="tTime" class="mono"></b><span class="small muted">previsão</span></div>
@@ -181,7 +181,7 @@
   });
   function legend() {
     const l = $("#tLeg"); if (!l) return; const parts = [];
-    if (T.layers.vento) parts.push(`Rajadas km/h: <span style="color:#6bbff2">40</span> <span style="color:#fae05a">55</span> <span style="color:#ff9e26">70</span> <span style="color:#f24d33">85</span> <span style="color:#d91a73">100</span> <span style="color:#9e33bf">115</span> <span style="color:#fff">130+</span>`);
+    if (T.layers.vento) parts.push(`Rajadas km/h: <span style="color:#6bbff2">40</span> <span style="color:#fae05a">55</span> <span style="color:#ff9e26">70</span> <span style="color:#f24d33">85</span> <span style="color:#d91a73">100</span> <span style="color:#9e33bf">115</span> <span style="color:var(--fg)">130+</span>`);
     if (T.layers.chuva) parts.push(`Chuva mm/3 h: <span style="color:#8cccff">0,5</span> <span style="color:#4099ff">2</span> <span style="color:#1a59f2">5</span> <span style="color:#8c40f2">10</span> <span style="color:#e633bf">20</span> <span style="color:#ff6666">40+</span>`);
     if (T.layers.isobaras) parts.push(`Isóbaras de 4 em 4 hPa · <b style="color:#ff5449">B</b> baixa · <b style="color:#4fc3f7">A</b> alta`);
     l.innerHTML = parts.join("<br>");
