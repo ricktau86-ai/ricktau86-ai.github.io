@@ -1,0 +1,45 @@
+name: Sentinela - tempestades (ECMWF)
+on:
+  schedule:
+    - cron: "35 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      forcar:
+        description: "Refazer mesmo sem corridas novas"
+        default: "0"
+permissions:
+  contents: write
+concurrency:
+  group: sentinela-tempestades
+  cancel-in-progress: false
+jobs:
+  processar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: sentinela/tempestades }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Instalar
+        run: pip install -q ecmwf-opendata cfgrib xarray eccodes scipy shapely matplotlib pillow
+      - name: Previsão anterior
+        run: |
+          git fetch -q origin sentinela-tempestades 2>/dev/null && git show origin/sentinela-tempestades:data.json > /tmp/prev.json 2>/dev/null || echo '{}' > /tmp/prev.json
+      - name: Processar ECMWF
+        id: proc
+        env: { FORCE: "${{ github.event.inputs.forcar || '0' }}" }
+        run: |
+          set +e
+          python3 sentinela/tempestades/tempestades.py /tmp/out /tmp/prev.json
+          code=$?
+          if [ $code -eq 3 ]; then echo "novo=0" >> $GITHUB_OUTPUT; exit 0; fi
+          [ $code -eq 0 ] && echo "novo=1" >> $GITHUB_OUTPUT
+          exit $code
+      - name: Publicar no ramo sentinela-tempestades
+        if: steps.proc.outputs.novo == '1'
+        run: |
+          cd /tmp/out && git init -q -b sentinela-tempestades && git add -A
+          git -c user.name="sentinela-bot" -c user.email="sentinela-bot@users.noreply.github.com" commit -q -m "Tempestades $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" sentinela-tempestades
+          du -sh /tmp/out; ls /tmp/out/frames | wc -l
