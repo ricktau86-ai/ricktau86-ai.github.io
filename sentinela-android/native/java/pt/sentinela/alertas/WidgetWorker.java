@@ -116,8 +116,65 @@ public class WidgetWorker extends Worker {
         } catch (Exception ex) {
             // ignora
         }
+        checkStorms(c, p, pt);
         SentinelaWidget.updateAll(c);
         return Result.success();
+    }
+
+    /** Lê o resultado do separador Tempestades (ECMWF, calculado no GitHub) e avisa uma vez por depressão
+     *  que entra em terra em Portugal ou passa a menos de 250 km. */
+    static void checkStorms(Context c, SharedPreferences p, Locale pt) {
+        try {
+            JSONObject d = new JSONObject(get("https://raw.githubusercontent.com/ricktau86-ai/ricktau86-ai.github.io/sentinela-tempestades/data.json"));
+            JSONArray st = d.optJSONArray("tempestades");
+            SimpleDateFormat iso = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+            iso.setTimeZone(TimeZone.getTimeZone("UTC"));
+            SimpleDateFormat hf = new SimpleDateFormat("EEE HH:mm", pt);
+            SimpleDateFormat h2 = new SimpleDateFormat("HH:mm", pt);
+            long now = System.currentTimeMillis();
+            String line = "", bestId = "", title = "", body = "";
+            int bestRank = 0;
+            for (int i = 0; st != null && i < st.length(); i++) {
+                JSONObject s = st.getJSONObject(i);
+                String nome = s.optString("nome", "");
+                String label = nome.isEmpty() ? "Depressão" : "Depressão " + nome;
+                long pmin = Math.round(s.optDouble("pmin", 0));
+                JSONObject lf = s.optJSONObject("entrada_em_terra");
+                int rank = 0; String l = "", t = "", b = "", day = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+                if (lf != null) {
+                    JSONArray pts = lf.optJSONArray("pontos"); int inPt = 0, tot = pts == null ? 0 : pts.length();
+                    for (int k = 0; k < tot; k++) {
+                        JSONArray q = pts.getJSONArray(k); double la = q.getDouble(0), lo = q.getDouble(1);
+                        if (la > 36.9 && la < 42.2 && lo < -7.38) inPt++;
+                    }
+                    JSONArray jan = lf.optJSONArray("janela");
+                    long t0 = jan == null ? 0 : iso.parse(jan.getString(0).substring(0, 19)).getTime();
+                    long t1 = jan == null ? 0 : iso.parse(jan.getString(1).substring(0, 19)).getTime();
+                    if (inPt >= Math.max(5, 0.3 * lf.optInt("de", 50)) && t1 > now - 3 * 3600000L) {
+                        rank = 2; day = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date(t0));
+                        l = label + ": terra " + hf.format(new Date(t0)) + "–" + h2.format(new Date(t1)) + ", perto de " + lf.optString("mais_provavel");
+                        t = label + " vai entrar em terra em Portugal";
+                        b = "Mais provável perto de " + lf.optString("mais_provavel") + ", " + hf.format(new Date(t0)) + "–" + h2.format(new Date(t1))
+                                + " (" + inPt + " de " + lf.optInt("de") + " cenários do ECMWF). Pressão mínima " + pmin + " hPa. Siga os avisos do IPMA.";
+                    }
+                }
+                if (rank == 0 && s.optInt("dist_pt_min_km", 9999) <= 250) {
+                    rank = 1;
+                    l = label + " passa a " + s.optInt("dist_pt_min_km") + " km de Portugal";
+                    t = label + " aproxima-se de Portugal";
+                    b = "Passagem mais próxima a cerca de " + s.optInt("dist_pt_min_km") + " km. Pressão mínima " + pmin + " hPa. Veja o separador Tempestades.";
+                }
+                if (rank > bestRank) { bestRank = rank; line = l; title = t; body = b; bestId = (nome.isEmpty() ? "sem-nome" : nome) + "|" + rank + "|" + day; }
+            }
+            p.edit().putString("storm", line).apply();
+            // uma notificação por depressão e por dia de entrada em terra (não repete a cada corrida do modelo)
+            if (bestRank > 0 && p.getBoolean("notify", true) && !bestId.equals(p.getString("stormNotifiedId", ""))) {
+                notifyWarn(c, title, body);
+                p.edit().putString("stormNotifiedId", bestId).apply();
+            }
+        } catch (Exception ex) {
+            // sem dados de tempestades: mantém o widget como está
+        }
     }
 
     static void notifyWarn(Context c, String title, String body) {

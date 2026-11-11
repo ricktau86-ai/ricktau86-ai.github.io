@@ -28,7 +28,7 @@
             android:textColor="#E6E1E5"
             android:textSize="18sp"
             android:textStyle="bold" />
-    </LinearLayout>
+</LinearLayout>
     <TextView
         android:id="@+id/w_bar"
         android:layout_width="40dp"
@@ -55,4 +55,16 @@
         android:textSize="12sp"
         android:maxLines="2"
         android:ellipsize="end" />
+    <TextView
+        android:id="@+id/w_storm"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text=""
+        android:textColor="#FFB4AB"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:visibility="gone" />
 </LinearLayout>

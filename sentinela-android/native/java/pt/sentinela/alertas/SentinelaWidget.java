@@ -70,6 +70,9 @@ public class SentinelaWidget extends AppWidgetProvider {
         v.setTextColor(R.id.w_title, COLORS[lvl]);
         v.setInt(R.id.w_bar, "setBackgroundColor", COLORS[lvl]);
         v.setTextViewText(R.id.w_sub, sub);
+        String storm = p.getString("storm", "");
+        v.setTextViewText(R.id.w_storm, storm);
+        v.setViewVisibility(R.id.w_storm, storm.isEmpty() ? android.view.View.GONE : android.view.View.VISIBLE);
         Intent i = new Intent(c, MainActivity.class);
         i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pi = PendingIntent.getActivity(c, 0, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);

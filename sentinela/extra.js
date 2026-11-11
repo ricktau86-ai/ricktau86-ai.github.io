@@ -210,6 +210,68 @@
     $("#rsGo").onclick = () => restoreFrom($("#rsCode").value);
   }
 
+  /* ---------------- PRIMEIROS SOCORROS (offline) ----------------
+     Baseado nas recomendações públicas do INEM e do Conselho Europeu de Ressuscitação (ERC 2021).
+     Orientação geral: não substitui formação nem as indicações do 112. */
+  const SOCORROS = [
+    { id: "112", t: "Ligar 112", s: "O que dizer", key: "Mantenha a calma e não desligue até o operador mandar.",
+      sec: [["Diga", ["Onde está: morada, localidade, pontos de referência (ou coordenadas do GPS)", "O que aconteceu e há quanto tempo", "Quantas vítimas e o estado de cada uma (respira? está consciente?)", "Riscos no local (fogo, trânsito, cabos elétricos, gás)"]],
+        ["Depois", ["Siga as instruções do operador", "Ponha o telemóvel em alta voz se tiver de ajudar a vítima", "Deixe alguém à espera da ambulância para a orientar"]]] },
+    { id: "sbv", t: "Não responde e não respira", s: "Suporte básico de vida (adulto)", key: "Ligue 112, comece compressões: 30 compressões e 2 insuflações. Peça um DAE.",
+      sec: [["Avaliar", ["Garanta que o local é seguro para si", "Toque nos ombros e pergunte em voz alta: «Está bem?»", "Se não responder: incline a cabeça para trás e levante o queixo", "Veja, ouça e sinta se respira normalmente, até 10 segundos. Respiração ocasional («arfar») não é respiração normal"]],
+        ["Se não respira normalmente", ["Ligue 112 (alta voz) e peça que alguém traga um desfibrilhador (DAE)", "Mãos sobrepostas no centro do peito, braços esticados", "Comprima 5 a 6 cm, ao ritmo de 100 a 120 por minuto, deixando o peito subir entre compressões", "30 compressões e 2 insuflações; se não souber ou não quiser fazer insuflações, faça só compressões, sem parar", "Ligue o DAE assim que chegar e siga as instruções de voz", "Não pare até chegar ajuda, a vítima recuperar ou ficar exausto"]]] },
+    { id: "pls", t: "Inconsciente mas respira", s: "Posição lateral de segurança", key: "Ponha de lado, cabeça inclinada para trás, e vigie a respiração.",
+      sec: [["Como fazer", ["Ajoelhe-se ao lado da vítima, de barriga para cima, pernas esticadas", "Braço mais próximo de si em ângulo reto, palma para cima", "Braço mais afastado sobre o peito, dorso da mão encostado à face do seu lado", "Dobre o joelho mais afastado e role a vítima para si", "Incline a cabeça para trás para manter a via aérea aberta", "Ligue 112 e reavalie a respiração regularmente"]],
+        ["Não use", ["Se suspeitar de lesão da coluna e a vítima respirar bem de barriga para cima, não a mova sem necessidade"]]] },
+    { id: "engasg", t: "Engasgamento", s: "Adulto ou criança com mais de 1 ano", key: "Tosse eficaz: incentive a tossir. Tosse ineficaz: 5 pancadas nas costas + 5 compressões abdominais.",
+      sec: [["Se consegue tossir", ["Incentive a tossir e não faça mais nada; vigie"]],
+        ["Se não consegue tossir, falar ou respirar", ["Incline a vítima para a frente e dê até 5 pancadas firmes entre as omoplatas com a base da mão", "Se não resultar: até 5 compressões abdominais (punho acima do umbigo, puxar para dentro e para cima)", "Alterne 5 pancadas e 5 compressões até desobstruir", "Ligue 112"]],
+        ["Se ficar inconsciente", ["Deite-a no chão, ligue 112 e inicie suporte básico de vida"]]] },
+    { id: "hemor", t: "Hemorragia grave", s: "Sangramento abundante", key: "Pressão direta e firme sobre a ferida, sem largar.",
+      sec: [["O que fazer", ["Ligue 112", "Use luvas ou um saco de plástico se tiver", "Pressione com força a ferida com compressas ou um pano limpo, sem levantar para espreitar", "Se o sangue atravessar, junte mais pano por cima e continue a pressionar", "Num braço ou perna, se a pressão não parar o sangue, um garrote acima da ferida pode salvar a vida: aperte até parar e anote a hora", "Deite a vítima e mantenha-a aquecida"]]] },
+    { id: "queim", t: "Queimaduras", s: "Calor, líquidos quentes, químicos", key: "Água corrente fresca durante pelo menos 20 minutos.",
+      sec: [["O que fazer", ["Arrefeça com água corrente fresca (não gelada) pelo menos 20 minutos", "Retire anéis, relógios e roupa que não esteja colada à pele", "Cubra com película aderente ou um pano limpo, sem apertar", "Ligue 112 em queimaduras grandes, na face, mãos, genitais, em crianças ou idosos"]],
+        ["Não faça", ["Não aplique gelo, manteiga, pasta de dentes ou pomadas", "Não rebente bolhas"]]] },
+    { id: "hipo", t: "Hipoglicemia", s: "Açúcar baixo no sangue", key: "Se consegue engolir: açúcar de absorção rápida e reavaliar ao fim de 15 minutos.",
+      sec: [["Sinais", ["Tremores, suores, palidez, fome, irritabilidade, confusão, comportamento estranho, sonolência"]],
+        ["Se está consciente e consegue engolir", ["Dê açúcar de absorção rápida: sumo, refrigerante com açúcar, açúcar dissolvido em água ou pastilhas de glicose", "Ao fim de 15 minutos, meça a glicemia se possível; se continuar baixa, repita", "Quando melhorar, dê um alimento com hidratos de absorção lenta (pão, bolachas)"]],
+        ["Se está inconsciente ou não consegue engolir", ["Não dê nada pela boca", "Posição lateral de segurança e ligue 112", "Se houver glucagon e souber usar, administre-o"]],
+        ["Pessoas com diabetes", ["Siga sempre o plano definido pela equipa médica (quantidades, bomba de insulina, glucagon)"]]] },
+    { id: "avc", t: "AVC", s: "Sinais de alerta", key: "Boca ao lado, falta de força num braço, dificuldade em falar: ligue 112 já.",
+      sec: [["Os 3 F", ["Face: boca ao lado, um lado da cara descaído", "Força: falta de força num braço ou perna", "Fala: dificuldade em falar ou em perceber"]],
+        ["O que fazer", ["Ligue 112 imediatamente, mesmo que os sinais passem", "Anote a hora em que os sinais começaram", "Não dê comida, bebida nem medicamentos"]]] },
+    { id: "enf", t: "Dor no peito", s: "Possível enfarte", key: "Ligue 112 e fique em repouso. Não vá a conduzir para o hospital.",
+      sec: [["Sinais", ["Dor ou aperto no peito que pode ir para o braço, pescoço, mandíbula ou costas", "Falta de ar, suores, náuseas, mal-estar", "Nas mulheres, idosos e pessoas com diabetes os sinais podem ser menos típicos"]],
+        ["O que fazer", ["Ligue 112", "Sente a pessoa numa posição confortável, desaperte a roupa", "Se deixar de responder e não respirar normalmente, inicie suporte básico de vida"]]] },
+    { id: "conv", t: "Convulsões", s: "Crise convulsiva", key: "Proteja a cabeça, afaste objetos e não meta nada na boca.",
+      sec: [["Durante", ["Afaste objetos perigosos e proteja a cabeça", "Não segure os movimentos e não meta nada na boca", "Veja as horas"]],
+        ["Depois", ["Posição lateral de segurança", "Ligue 112 se durar mais de 5 minutos, se repetir, se for a primeira vez, se houver ferimentos ou se não recuperar a consciência"]]] },
+    { id: "calor", t: "Golpe de calor e hipotermia", s: "Temperaturas extremas", key: "Calor: arrefecer e 112 se houver confusão. Frio: abrigar e aquecer devagar.",
+      sec: [["Golpe de calor", ["Leve para local fresco e à sombra, desaperte a roupa", "Arrefeça com água e ventilação; panos frescos no pescoço, axilas e virilhas", "Se estiver consciente, dê água aos poucos", "Ligue 112 se houver confusão, desmaio ou convulsões"]],
+        ["Hipotermia", ["Leve para um local abrigado, retire a roupa molhada", "Cubra com mantas, incluindo a cabeça; aqueça devagar", "Bebidas quentes só se estiver bem acordado (nunca álcool)", "Ligue 112 se estiver sonolento, confuso ou com tremores intensos"]]] },
+    { id: "outros", t: "Afogamento, choque elétrico, intoxicação", s: "Outras situações", key: "Primeiro a sua segurança. Intoxicações: CIAV 800 250 250.",
+      sec: [["Afogamento", ["Não entre na água se não for seguro; atire algo que flutue", "Fora de água, se não respirar normalmente, ligue 112 e inicie suporte básico de vida; se tiver formação, comece com 5 insuflações"]],
+        ["Choque elétrico", ["Não toque na vítima antes de desligar a corrente", "Ligue 112; se não respirar normalmente, inicie suporte básico de vida"]],
+        ["Intoxicação", ["Ligue para o Centro de Informação Antivenenos: 800 250 250", "Não provoque o vómito; guarde a embalagem do produto"]],
+        ["Fraturas", ["Não tente endireitar; imobilize na posição encontrada", "Ligue 112 se for grave ou se houver ferida aberta"]]] }
+  ];
+  function openSocorros(id) {
+    if (!id) {
+      openSheet(`<h3>Primeiros socorros</h3><p class="small">Disponível sem internet. Em caso de dúvida, ligue <a href="tel:112" style="color:var(--y);font-weight:700">112</a>: o operador orienta-o.</p>
+        <div class="group">${SOCORROS.map(x => `<button class="item" data-fa="${x.id}"><span class="it"><b>${esc(x.t)}</b><span>${esc(x.s)}</span></span>${ic(P.chev, "i s muted")}</button>`).join("")}</div>
+        <p class="small muted">Baseado nas recomendações do INEM e do Conselho Europeu de Ressuscitação (2021). Não substitui um curso de primeiros socorros.</p>`);
+      document.querySelectorAll("#sheet [data-fa]").forEach(b => b.onclick = () => openSocorros(b.dataset.fa));
+      return;
+    }
+    const x = SOCORROS.find(q => q.id === id); if (!x) return;
+    openSheet(`<button class="back" id="faBack" aria-label="Voltar" style="margin:0 0 4px -8px">${ic(P.back)}</button><h3>${esc(x.t)}</h3>
+      <div class="guide" style="display:flex;flex-direction:column;gap:12px;margin-top:8px"><div class="key">${esc(x.key)}</div>
+      ${x.sec.map(([h, it]) => `<div class="w" style="padding:12px"><h4>${esc(h)}</h4><ul>${it.map(i => `<li>${esc(i)}</li>`).join("")}</ul></div>`).join("")}</div>
+      <div class="row"><a class="btn y" href="tel:112">Ligar 112</a>${id === "outros" ? `<a class="btn" href="tel:800250250">Antivenenos</a>` : ""}</div>
+      <p class="small muted">Fonte: INEM e ERC 2021. Siga sempre as indicações do 112.</p>`);
+    $("#faBack").onclick = () => openSocorros();
+  }
+
   /* ---------------- SEPARADOR EXTRA ---------------- */
   const renderExtra = safe(function () {
     const v = $("#v-extra"); if (!v || v.hidden) return;
@@ -217,6 +279,9 @@
     let html = `<div class="ptitle"><h1>Extra</h1></div>
       <div class="w"><div class="wh"><h2>Estou bem</h2><button class="lnk" id="btCt">Contactos (${getContacts().length})</button></div><div class="small muted">Numa emergência, avise a família num toque: estado, localização, hora e bateria.</div>
         <div class="row" style="display:flex;gap:8px"><button class="btn y" style="flex:1" id="btOk">${ic(P.check, "i s")}Estou bem</button><button class="btn" style="flex:1;background:#93000a;color:#ffdad6" id="btHelp">${ic(P.alert, "i s")}Preciso de ajuda</button></div></div>`;
+    html += `<div class="w"><div class="wh"><h2>Primeiros socorros</h2><span class="small muted">sem internet</span></div>
+      <div class="small muted">O que fazer em paragem cardíaca, engasgamento, hemorragia, queimaduras, hipoglicemia, AVC e mais.</div>
+      <div class="row" style="display:flex;gap:8px"><button class="btn y" style="flex:1" id="faOpen">Abrir guias</button><a class="btn" style="flex:1;background:#93000a;color:#ffdad6" href="tel:112">Ligar 112</a></div></div>`;
     // Fogos por satélite
     html += `<div class="w"><div class="wh"><h2>Fogos por satélite</h2>${X.firms ? `<button class="lnk" id="firmsMap">Ver no mapa</button>` : ""}</div>`;
     if (!NATIVE && !X.firms) html += `<div class="empty">Disponível na app Android (a NASA não permite a leitura a partir do browser).</div>`;
@@ -251,7 +316,7 @@
       <div class="foot">Fontes: NASA FIRMS, CAMS/Open-Meteo, IPMA, Proteção Civil.</div>`;
     v.innerHTML = html;
     $("#btOk").onclick = () => imOk(true); $("#btHelp").onclick = () => imOk(false);
-    $("#btCt").onclick = editContacts; $("#bkSave").onclick = doBackup; $("#bkLoad").onclick = doRestore;
+    $("#faOpen").onclick = () => openSocorros();     $("#btCt").onclick = editContacts; $("#bkSave").onclick = doBackup; $("#bkLoad").onclick = doRestore;
     const fm = $("#firmsMap"); if (fm) fm.onclick = showFirmsOnMap;
     v.querySelectorAll("[data-f]").forEach(b => b.onclick = () => sheetFirms(X._near[+b.dataset.f]));
     const wr = $("#wRefresh"); if (wr) wr.onclick = () => { pushWidget(true); toast("Widget a atualizar"); };
