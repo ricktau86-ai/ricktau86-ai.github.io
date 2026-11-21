@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sc_ok">Estou bem</string>
+    <string name="sc_help">Preciso de ajuda</string>
+    <string name="sc_fa">Primeiros socorros</string>
+    <string name="sc_storm">Tempestades</string>
+    <string name="wd_tempo">Temperatura, chuva nas próximas horas e rajada máxima de hoje</string>
+    <string name="wd_mini">Cor do aviso mais grave e temperatura</string>
+    <string name="wd_ocorr">As ocorrências da Proteção Civil mais perto de si</string>
+    <string name="wd_ok">Avisar a família num toque: Estou bem / Preciso de ajuda</string>
+    <string name="wd_amb">Risco de incêndio, qualidade do ar e índice UV</string>
+    <string name="wd_storm">Depressões a aproximar-se de Portugal e entrada em terra</string>
+</resources>

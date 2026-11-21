@@ -48,7 +48,8 @@ public class SentinelaWidget extends AppWidgetProvider {
     }
 
     static void refreshNow(Context c) {
-        WorkManager.getInstance(c).enqueue(new OneTimeWorkRequest.Builder(WidgetWorker.class).setConstraints(net()).build());
+        WorkManager.getInstance(c).enqueueUniqueWork("sentinela_agora", androidx.work.ExistingWorkPolicy.KEEP,
+                new OneTimeWorkRequest.Builder(WidgetWorker.class).setConstraints(net()).build());
     }
 
     static void updateAll(Context c) {

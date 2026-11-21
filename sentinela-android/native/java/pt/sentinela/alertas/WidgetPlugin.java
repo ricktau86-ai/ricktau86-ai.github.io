@@ -19,10 +19,21 @@ public class WidgetPlugin extends Plugin {
         e.putString("name", call.getString("name", "Leiria"));
         e.putString("area", call.getString("area", "LRA"));
         e.putString("areaName", call.getString("areaName", "Leiria"));
+        Integer rad = call.getInt("radius", 25);
+        e.putInt("radius", rad == null ? 25 : Math.max(5, Math.min(300, rad)));
         e.putBoolean("notify", Boolean.TRUE.equals(call.getBoolean("notify", true)));
         e.apply();
         SentinelaWidget.schedule(c);
         SentinelaWidget.refreshNow(c);
         call.resolve();
+    }
+
+    /** Ação pendente vinda de um widget ou atalho (ex.: "estoubem"), lida pela app ao arrancar. */
+    @PluginMethod
+    public void consumeAction(PluginCall call) {
+        com.getcapacitor.JSObject r = new com.getcapacitor.JSObject();
+        r.put("acao", MainActivity.pendingAction == null ? "" : MainActivity.pendingAction);
+        MainActivity.pendingAction = null;
+        call.resolve(r);
     }
 }

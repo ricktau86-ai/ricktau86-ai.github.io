@@ -116,8 +116,9 @@ public class WidgetWorker extends Worker {
         } catch (Exception ex) {
             // ignora
         }
+        WidgetData.fetchAll(c, p);
         checkStorms(c, p, pt);
-        SentinelaWidget.updateAll(c);
+        Widgets.updateAll(c);
         return Result.success();
     }
 
@@ -133,7 +134,7 @@ public class WidgetWorker extends Worker {
             SimpleDateFormat h2 = new SimpleDateFormat("HH:mm", pt);
             long now = System.currentTimeMillis();
             String line = "", bestId = "", title = "", body = "";
-            int bestRank = 0;
+            int bestRank = 0; JSONObject bestStorm = null;
             for (int i = 0; st != null && i < st.length(); i++) {
                 JSONObject s = st.getJSONObject(i);
                 String nome = s.optString("nome", "");
@@ -164,9 +165,10 @@ public class WidgetWorker extends Worker {
                     t = label + " aproxima-se de Portugal";
                     b = "Passagem mais próxima a cerca de " + s.optInt("dist_pt_min_km") + " km. Pressão mínima " + pmin + " hPa. Veja o separador Tempestades.";
                 }
-                if (rank > bestRank) { bestRank = rank; line = l; title = t; body = b; bestId = (nome.isEmpty() ? "sem-nome" : nome) + "|" + rank + "|" + day; }
+                if (rank > bestRank) { bestStorm = s; bestRank = rank; line = l; title = t; body = b; bestId = (nome.isEmpty() ? "sem-nome" : nome) + "|" + rank + "|" + day; }
             }
-            p.edit().putString("storm", line).apply();
+            p.edit().putString("storm", line).putLong("s_upd", System.currentTimeMillis()).putString("s_run", d.optString("ens_run", "")).apply();
+            if (bestStorm != null) WidgetData.stormDetails(p, bestStorm, bestRank, pt); else p.edit().putInt("s_rank", 0).apply();
             // uma notificação por depressão e por dia de entrada em terra (não repete a cada corrida do modelo)
             if (bestRank > 0 && p.getBoolean("notify", true) && !bestId.equals(p.getString("stormNotifiedId", ""))) {
                 notifyWarn(c, title, body);

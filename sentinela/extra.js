@@ -326,9 +326,10 @@
   const pushWidget = safe(function (force) {
     const pl = NATIVE && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SentinelaWidget; if (!pl) return;
     const m = cfg.me; const area = nearestArea(m.lat, m.lon);
-    const sig = [m.lat.toFixed(3), m.lon.toFixed(3), area, cfg.nAlerts].join("|");
+    const rad = Math.min(300, Math.max(5, cfg.radius || 25));
+    const sig = [m.lat.toFixed(3), m.lon.toFixed(3), area, cfg.nAlerts, rad].join("|");
     if (!force && sig === X.lastWidget) return; X.lastWidget = sig;
-    pl.save({ lat: m.lat, lon: m.lon, name: m.name || "Sentinela", area, areaName: areaName(area), notify: !!cfg.nAlerts }).catch(() => { });
+    pl.save({ lat: m.lat, lon: m.lon, name: m.name || "Sentinela", area, areaName: areaName(area), notify: !!cfg.nAlerts, radius: rad }).catch(() => { });
   });
 
   /* ---------------- ciclo ---------------- */
@@ -339,6 +340,18 @@
     renderExtra(); renderRoads(); pushWidget(false);
   }
   window.extraShow = safe(function (v) { if (v === "estradas") renderRoads(); if (v === "extra") { renderExtra(); if (!X.pollen) tick(); } });
+  /* ---------- ações vindas dos widgets e dos atalhos do ícone ---------- */
+  const doAcao = safe(function (a) {
+    if (!a) return;
+    if (a === "estoubem" || a === "ajuda") { go("extra"); setTimeout(() => imOk(a === "estoubem"), 250); }
+    else if (a === "socorros") { go("extra"); setTimeout(() => openSocorros(), 250); }
+    else if (a === "tempestades") go("tempestades");
+    else if (a === "extra") go("extra");
+  });
+  window.addEventListener("sentinelaAcao", (ev) => doAcao(ev && ev.acao));
+  const consume = () => { const pl = NATIVE && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SentinelaWidget; if (pl && pl.consumeAction) pl.consumeAction().then(r => doAcao(r && r.acao)).catch(() => { }); };
+  setTimeout(consume, 600);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") setTimeout(consume, 300); });
   setTimeout(tick, 2500);
   setInterval(tick, 10 * 60e3);
   setInterval(() => { renderRoads(); }, 30e3);

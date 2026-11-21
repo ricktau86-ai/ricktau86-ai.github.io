@@ -41,6 +41,18 @@ jobs:
           sed -i 's#</application>#    <receiver android:name=".SentinelaWidget" android:exported="true" android:label="Sentinela"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" /></receiver>\n    </application>#' $M
           printf '\ndependencies {\n    implementation "androidx.work:work-runtime:2.9.1"\n}\n' >> $G
           grep -n "SentinelaWidget" $M
+          # widgets novos e atalhos no ícone
+          python3 - "$M" native/manifest_extra.xml <<'PY'
+          import sys
+          m, extra = sys.argv[1], open(sys.argv[2]).read()
+          s = open(m).read()
+          s = s.replace("</application>", extra + "    </application>", 1)
+          i = s.find("android.intent.category.LAUNCHER")
+          j = s.find("</intent-filter>", i) + len("</intent-filter>")
+          s = s[:j] + '\n            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />' + s[j:]
+          open(m, "w").write(s)
+          PY
+          grep -c "Widget\"" $M; grep -n "app.shortcuts" $M
           cat >> $G <<'GRADLE'
           android {
               signingConfigs {

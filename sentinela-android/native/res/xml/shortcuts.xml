@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+  <shortcut android:shortcutId="estoubem" android:enabled="true" android:icon="@drawable/sc_ok" android:shortcutShortLabel="@string/sc_ok" android:shortcutLongLabel="@string/sc_ok">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="pt.sentinela.alertas" android:targetClass="pt.sentinela.alertas.MainActivity">
+      <extra android:name="acao" android:value="estoubem"/>
+    </intent>
+  </shortcut>
+  <shortcut android:shortcutId="ajuda" android:enabled="true" android:icon="@drawable/sc_help" android:shortcutShortLabel="@string/sc_help" android:shortcutLongLabel="@string/sc_help">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="pt.sentinela.alertas" android:targetClass="pt.sentinela.alertas.MainActivity">
+      <extra android:name="acao" android:value="ajuda"/>
+    </intent>
+  </shortcut>
+  <shortcut android:shortcutId="socorros" android:enabled="true" android:icon="@drawable/sc_fa" android:shortcutShortLabel="@string/sc_fa" android:shortcutLongLabel="@string/sc_fa">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="pt.sentinela.alertas" android:targetClass="pt.sentinela.alertas.MainActivity">
+      <extra android:name="acao" android:value="socorros"/>
+    </intent>
+  </shortcut>
+  <shortcut android:shortcutId="tempestades" android:enabled="true" android:icon="@drawable/sc_storm" android:shortcutShortLabel="@string/sc_storm" android:shortcutLongLabel="@string/sc_storm">
+    <intent android:action="android.intent.action.VIEW" android:targetPackage="pt.sentinela.alertas" android:targetClass="pt.sentinela.alertas.MainActivity">
+      <extra android:name="acao" android:value="tempestades"/>
+    </intent>
+  </shortcut>
+</shortcuts>

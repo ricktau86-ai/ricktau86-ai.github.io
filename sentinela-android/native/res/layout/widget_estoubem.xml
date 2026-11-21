@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/w_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:background="@drawable/widget_bg" android:padding="8dp">
+  <TextView android:id="@+id/e_ok" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:layout_marginEnd="6dp" android:background="@drawable/btn_ok_bg" android:gravity="center" android:text="✓ Estou bem" android:textColor="#1A1700" android:textSize="14sp" android:textStyle="bold" android:maxLines="2"/>
+  <TextView android:id="@+id/e_help" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:background="@drawable/btn_help_bg" android:gravity="center" android:text="⚠ Preciso de ajuda" android:textColor="#FFDAD6" android:textSize="14sp" android:textStyle="bold" android:maxLines="2"/>
+</LinearLayout>
