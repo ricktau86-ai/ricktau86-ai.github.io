@@ -1,0 +1,28 @@
+plugins { id "com.android.application" }
+android {
+    namespace "pt.sentinela.relogio"
+    compileSdk 34
+    defaultConfig {
+        applicationId "pt.sentinela.relogio"
+        minSdk 30
+        targetSdk 34
+        versionCode((System.getenv("BUILD_N") ?: "1").toInteger())
+        versionName "1." + (System.getenv("BUILD_N") ?: "0")
+    }
+    signingConfigs {
+        sentinela { storeFile file("../../sentinela-android/sentinela.keystore"); storePassword "sentinela-apk"; keyAlias "sentinela"; keyPassword "sentinela-apk" }
+    }
+    buildTypes {
+        release { signingConfig signingConfigs.sentinela; minifyEnabled false }
+        debug { signingConfig signingConfigs.sentinela }
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    lint { abortOnError false; checkReleaseBuilds false }
+}
+dependencies {
+    implementation "androidx.work:work-runtime:2.9.1"
+    implementation "androidx.wear.tiles:tiles:1.4.0"
+    implementation "androidx.wear.protolayout:protolayout:1.2.0"
+    implementation "androidx.wear.watchface:watchface-complications-data-source:1.2.1"
+    implementation "com.google.guava:guava:33.2.1-android"
+}

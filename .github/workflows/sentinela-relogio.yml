@@ -1,0 +1,42 @@
+name: Sentinela - app do relógio (Wear OS)
+on:
+  push:
+    branches: [main]
+    paths: ["sentinela-wear/**", ".github/workflows/sentinela-relogio.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: sentinela-relogio
+  cancel-in-progress: true
+jobs:
+  wear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - name: Compilar
+        working-directory: sentinela-wear
+        env: { BUILD_N: "${{ github.run_number }}" }
+        run: |
+          gradle assembleRelease --no-daemon --stacktrace 2>&1 | tail -80
+          test -f app/build/outputs/apk/release/app-release.apk
+          cp app/build/outputs/apk/release/app-release.apk ../SentinelaRelogio.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: SentinelaRelogio, path: SentinelaRelogio.apk }
+      - name: Publicar em Releases (link fixo)
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          gh release delete sentinela-relogio --yes --cleanup-tag || true
+          gh release create sentinela-relogio SentinelaRelogio.apk --target "${{ github.sha }}" --title "Sentinela para relógio Wear OS (1.${{ github.run_number }})" --notes "Instalar no relógio com o Wear Installer 2 (depuração por Wi-Fi)."
+      - name: Pôr no site
+        run: |
+          git pull -q origin main || true
+          cp SentinelaRelogio.apk sentinela/SentinelaRelogio.apk
+          git add sentinela/SentinelaRelogio.apk
+          git -c user.name="sentinela-bot" -c user.email="sentinela-bot@users.noreply.github.com" commit -q -m "Sentinela relógio: APK 1.${{ github.run_number }}" || exit 0
+          git push -q origin HEAD:main
