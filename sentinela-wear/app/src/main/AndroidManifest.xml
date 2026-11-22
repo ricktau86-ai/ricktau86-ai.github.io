@@ -26,6 +26,18 @@
             <meta-data android:name="androidx.wear.tiles.PREVIEW" android:resource="@drawable/tile_preview" />
         </service>
 
+        <service android:name=".ChuvaTile" android:exported="true" android:label="Sentinela · Chuva 2 h"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter><action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" /></intent-filter>
+            <meta-data android:name="androidx.wear.tiles.PREVIEW" android:resource="@drawable/tile_prev_chuva" />
+        </service>
+
+        <service android:name=".HorasTile" android:exported="true" android:label="Sentinela · Hora a hora"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter><action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" /></intent-filter>
+            <meta-data android:name="androidx.wear.tiles.PREVIEW" android:resource="@drawable/tile_prev_horas" />
+        </service>
+
         <service android:name=".SentinelaComplicacao" android:exported="true" android:label="Sentinela (aviso e temperatura)"
             android:icon="@drawable/ic_compl"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">

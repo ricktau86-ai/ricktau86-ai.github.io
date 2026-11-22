@@ -82,7 +82,11 @@ public class Dados {
         ocorrencias(p);
         tempestade(p);
         p.edit().putLong("upd", System.currentTimeMillis()).apply();
-        try { TileService.getUpdater(c).requestUpdate(SentinelaTile.class); } catch (Exception ignored) { }
+        try {
+            TileService.getUpdater(c).requestUpdate(SentinelaTile.class);
+            TileService.getUpdater(c).requestUpdate(ChuvaTile.class);
+            TileService.getUpdater(c).requestUpdate(HorasTile.class);
+        } catch (Exception ignored) { }
         try {
             ComplicationDataSourceUpdateRequester.create(c, new ComponentName(c, SentinelaComplicacao.class)).requestUpdateAll();
         } catch (Exception ignored) { }
@@ -182,7 +186,8 @@ public class Dados {
             String lat = p.getString("lat", "39.744"), lon = p.getString("lon", "-8.807");
             JSONObject j = new JSONObject(get("https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon
                     + "&current=temperature_2m,weather_code,is_day"
-                    + "&hourly=temperature_2m,weather_code,precipitation_probability,precipitation,is_day&forecast_hours=13"
+                    + "&minutely_15=precipitation&forecast_minutely_15=10"
+                    + "&hourly=temperature_2m,weather_code,precipitation_probability,precipitation,is_day,wind_gusts_10m&forecast_hours=13"
                     + "&daily=temperature_2m_max,temperature_2m_min,wind_gusts_10m_max&forecast_days=1&timezone=Europe%2FLisbon"));
             JSONObject cur = j.getJSONObject("current"), d = j.getJSONObject("daily"), h = j.getJSONObject("hourly");
             JSONArray pp = h.getJSONArray("precipitation_probability"), pr = h.getJSONArray("precipitation"), ht = h.getJSONArray("time"),
@@ -201,6 +206,33 @@ public class Dados {
                         .append(Math.round(tt.optDouble(i))).append("°|")
                         .append(pp.isNull(i) ? 0 : pp.getInt(i)).append("%\n");
             }
+            // hora a hora (5 horas seguidas, para o mosaico)
+            StringBuilder h1 = new StringBuilder();
+            long agora = System.currentTimeMillis();
+            SimpleDateFormat isoL = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US);
+            isoL.setTimeZone(TimeZone.getTimeZone("Europe/Lisbon"));
+            int n1 = 0;
+            double gmax = 0; String gh = "";
+            JSONArray gu = h.optJSONArray("wind_gusts_10m");
+            for (int i = 0; i < ht.length() && n1 < 5; i++) {
+                if (isoL.parse(ht.getString(i)).getTime() + 3600000L <= agora) continue;
+                h1.append(ht.getString(i).substring(11, 13)).append("h|").append(emoji(wc.optInt(i), dy.optInt(i, 1) == 1)).append('|')
+                        .append(Math.round(tt.optDouble(i))).append("°|").append(pp.isNull(i) ? 0 : pp.getInt(i)).append('\n');
+                if (gu != null && gu.optDouble(i, 0) > gmax) { gmax = gu.optDouble(i, 0); gh = ht.getString(i).substring(11, 13) + "h"; }
+                n1++;
+            }
+            // chuva de 15 em 15 minutos (próximas 2 h)
+            StringBuilder q = new StringBuilder();
+            JSONObject m15 = j.optJSONObject("minutely_15");
+            if (m15 != null) {
+                JSONArray mt = m15.getJSONArray("time"), mp = m15.getJSONArray("precipitation");
+                int nq = 0;
+                for (int i = 0; i < mt.length() && nq < 8; i++) {
+                    if (isoL.parse(mt.getString(i)).getTime() + 15 * 60000L <= agora) continue;
+                    q.append(mt.getString(i).substring(11, 16)).append('|').append(mp.isNull(i) ? 0 : mp.getDouble(i)).append('\n');
+                    nq++;
+                }
+            }
             int code = cur.getInt("weather_code");
             long gust = Math.round(d.getJSONArray("wind_gusts_10m_max").getDouble(0));
             p.edit()
@@ -213,6 +245,9 @@ public class Dados {
                     .putString("t_gust", "💨 rajada até " + gust + " km/h")
                     .putLong("t_gustv", gust)
                     .putString("t_horas", horas.toString())
+                    .putString("t_h1", h1.toString())
+                    .putString("t_h1_gust", gmax > 0 ? "💨 rajada " + Math.round(gmax) + " km/h às " + gh : "")
+                    .putString("t_q15", q.toString())
                     .putLong("t_upd", System.currentTimeMillis())
                     .apply();
         } catch (Exception ignored) { }

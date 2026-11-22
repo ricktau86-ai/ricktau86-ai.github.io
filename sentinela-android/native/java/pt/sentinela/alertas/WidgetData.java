@@ -44,6 +44,7 @@ public class WidgetData {
         weather(p, lat, lon);
         ambiente(p, lat, lon);
         ocorrencias(p, Double.parseDouble(lat), Double.parseDouble(lon));
+        Previsao.fetch(p, lat, lon);
     }
 
     /* ---------- Tempo (Open-Meteo) ---------- */

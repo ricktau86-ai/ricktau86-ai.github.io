@@ -10,4 +10,8 @@
     <string name="wd_ok">Avisar a família num toque: Estou bem / Preciso de ajuda</string>
     <string name="wd_amb">Risco de incêndio, qualidade do ar e índice UV</string>
     <string name="wd_storm">Depressões a aproximar-se de Portugal e entrada em terra</string>
+    <string name="wd_chuva">Chuva nas próximas 2 horas, de 15 em 15 minutos</string>
+    <string name="wd_horas">Hora a hora: temperatura, chuva e rajada nas próximas 8 horas</string>
+    <string name="wd_dias">Próximos 5 dias: chuva, mínimas e máximas</string>
+    <string name="wd_grafico">Gráfico das próximas 24 horas: temperatura e chuva</string>
 </resources>

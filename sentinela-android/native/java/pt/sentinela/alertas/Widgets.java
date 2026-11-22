@@ -44,6 +44,11 @@ public class Widgets {
             else if (k == AmbienteWidget.class) ambiente(c, m, ids);
             else if (k == TempestadeWidget.class) tempestade(c, m, ids);
         }
+        Class<?>[] prev = {ChuvaWidget.class, HorasWidget.class, DiasWidget.class, GraficoWidget.class};
+        for (int t = 0; t < prev.length; t++) {
+            int[] ids = m.getAppWidgetIds(new ComponentName(c, prev[t]));
+            if (ids != null && ids.length > 0) Previsao.update(c, m, ids, t);
+        }
     }
 
     static void tempo(Context c, AppWidgetManager m, int[] ids) {
